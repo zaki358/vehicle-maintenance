@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>auth-errors.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>auth-errors.ts</h1>
+    <div class="doc-path">src/features/auth/lib/auth-errors.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      Supabase Auth（<code>@supabase/auth-js</code>）が返すエラーコードを、
+      ログイン画面や <code>/set-password</code> 画面にそのまま表示できる
+      日本語メッセージへ変換する純粋関数です。Supabase の <code>AuthError</code>
+      は英語の <code>message</code>（例: <code>"Invalid login credentials"</code>）
+      をそのまま表示すると利用者に不親切なため、この変換が必要になります。
+    </p>
+    <p>
+      <code>src/**/lib/**</code> は <code>@supabase/*</code> を import
+      できない境界ルール（<code>CLAUDE.md</code>）があるため、実際の
+      <code>AuthError</code> 型は使わず、必要なフィールドだけを持つ
+      構造的な型（<code>AuthErrorLike</code>）で受け取ります。呼び出し側
+      （サーバー関数）が <code>{ code: error.code, message: error.message }</code>
+      の形に詰め替えてから渡す想定です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AuthErrorLike</code></td><td>type</td><td>Supabase の AuthError から必要な形だけを取り出した型（非export）</td></tr>
+        <tr><td><code>authErrorMessage</code></td><td>function（export）</td><td>エラーコードから日本語メッセージへ変換する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>type AuthErrorLike = {
+  code?: string
+  message: string
+}</code></pre>
+      <p>
+        <code>code</code> は省略可能です。<code>@supabase/auth-js</code> の
+        型定義上も、レスポンスを受け取る前に発生するエラー（ネットワーク
+        断など）では <code>code</code> が付かないことがあるため、その
+        ケースも扱えるようにしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function authErrorMessage(error: AuthErrorLike): string {
+  switch (error.code) {
+    case 'invalid_credentials':
+    case 'user_not_found':
+      return 'メールアドレスまたはパスワードが正しくありません'
+    ...
+    default:
+      return GENERIC_MESSAGE
+  }
+}</code></pre>
+      <p>
+        <strong>ユーザー列挙対策</strong> — <code>invalid_credentials</code>
+        （パスワードが違う）と <code>user_not_found</code>（そのメール
+        アドレスのアカウントが無い）を、あえて同じ文言にしています。
+        別々のメッセージにすると、第三者が「このメールアドレスは登録
+        されているか」を総当たりで調べられてしまいます（ユーザー列挙
+        攻撃）。このアプリは公開サインアップが無く、招待されたメール
+        アドレスの一覧そのものが非公開情報であるため、特に重要な対策です。
+      </p>
+      <p>
+        <strong>関連コードのグルーピング</strong> — <code>over_request_rate_limit</code>
+        と <code>over_email_send_rate_limit</code>、および
+        <code>session_expired</code> / <code>session_not_found</code> /
+        <code>refresh_token_not_found</code> / <code>refresh_token_already_used</code>
+        は、利用者からは区別する意味が無い（どれも「もう一度ログインし直す」
+        という同じアクションにつながる）ため、<code>switch</code> の
+        フォールスルーでまとめて同じメッセージに寄せています。
+      </p>
+      <p>
+        <strong>フォールバック</strong> — <code>Supabase Auth</code> の
+        エラーコード一覧（<code>error-codes.ts</code>）には MFA・SSO・電話
+        認証など、このアプリでは使わない機能のコードも多数含まれます。
+        それらや将来追加される未知のコードは、すべて
+        <code>default</code> の汎用メッセージに落とします。エラー
+        メッセージが内部実装の詳細を漏らさないようにする、という
+        セキュリティ上の方針にも沿っています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/auth/lib/auth-errors.ts
+  </footer>
+
+</div>
+</body>
+</html>

@@ -3,17 +3,19 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06(dashboard/lib 完成)（`features/maintenance/lib` 完成）
+最終更新: 2026-09-06(auth/lib 完成、Phase 3 完了)（`features/maintenance/lib` 完成）
 
 ---
 
 ## 現在地
 
-**Phase 1 完了。Phase 3（純粋ロジック）残るは auth/lib のみ。**
+**Phase 1 完了。Phase 3（純粋ロジック）完了。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
-`src/features/dashboard/lib/*`（2ファイル）がすべて TDD で完成し、
-**185 テスト・カバレッジ全指標 100%**。
+`src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
+すべて TDD で完成し、**205 テスト・カバレッジ全指標 100%**。
+Phase 3（純粋ロジック）はこれで完了。次は Phase 4（認証）以降だが、
+Supabase プロジェクト作成待ちのため着手不可(下記参照)。
 専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
@@ -101,6 +103,14 @@
       `vehicles.current_odometer`列は持たない設計方針どおり)・`sinceLastService`をまとめた
       ダッシュボード用サマリーを組み立てる。6テスト
 - [x] **dashboard/lib 2ファイルの解説ドキュメント生成完了** — `docs/src/features/dashboard/lib/*.html`
+- [x] **`src/features/auth/lib/login-schema.ts` 完成** — `loginSchema`(Zod)。email(trim→必須→
+      形式検証の順でチェーン。trimをemail検証より前に置くのが要点)/password(空文字のみ拒否、
+      強度要件や trim は課さない=ログイン画面の責務ではないため)。6テスト
+- [x] **`src/features/auth/lib/auth-errors.ts` 完成** — `authErrorMessage`。Supabase Auth の
+      エラーコード(`@supabase/auth-js`の`error-codes.ts`をnode -eで確認して実在するコードのみ対応)を
+      日本語メッセージへ変換。`invalid_credentials`と`user_not_found`を同一文言にしてユーザー列挙を防止。
+      `@supabase/*`をimportしないよう構造的型`AuthErrorLike`で受け取る設計。13テスト
+- [x] **auth/lib 2ファイルの解説ドキュメント生成完了** — `docs/src/features/auth/lib/*.html`
 
 ## 判断の記録
 
@@ -135,21 +145,25 @@ Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
 2. ~~**`features/maintenance/lib/*`**~~ — **完成済み**（`work-types.ts` / `record-schema.ts` /
    `filter-records.ts` / `sort-records.ts` / `part-suggestions.ts` / `odometer.ts`）
 3. ~~**`features/dashboard/lib/*`**~~ — **完成済み**（`since-last-service.ts` / `build-summary.ts`）
-4. **`features/auth/lib/*`** — `login-schema.ts`（Zod）、`auth-errors.ts`
+4. ~~**`features/auth/lib/*`**~~ — **完成済み**（`login-schema.ts` / `auth-errors.ts`）
 
-そのあと **Phase 2（DB とマイグレーション）** — **依頼者の Supabase プロジェクト作成待ち**。
-Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）にすぐ入れる。
+**Phase 3 はこれで全項目完了。** 次は **Phase 2（DB とマイグレーション）** —
+**依頼者の Supabase プロジェクト作成待ち**（下記「依頼者にお願いする作業」参照）。
+DB ができ次第 Phase 4（認証配線）にすぐ入れる状態。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 185 テストが
-全て通り、カバレッジが崩れていないことを確認してから続きに着手すること
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 205 テストが
+全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-次は「次にやること」の 4番目 `features/auth/lib` から着手する。
-
+**Phase 3（純粋ロジック）は全て完了したため、Phase 2（DB）に進めるかどうか
+依頼者に Supabase プロジェクト作成が完了したか確認すること。** 未完了なら、
+このセッションで新たに着手できる純粋ロジックの作業は無い(実装プランに
+記載の`features/*/lib/*`は全て完成済み)。
 **中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`・
-`src/features/maintenance/lib/*`・`src/features/dashboard/lib/*` が完成し、コミット済み。
-次は `features/auth/lib` から着手する。
+`src/features/maintenance/lib/*`・`src/features/dashboard/lib/*`・`src/features/auth/lib/*` が
+すべて完成し、コミット済み(Phase 3 完了)。次は Supabase プロジェクト作成の進捗確認、
+完了していれば Phase 2（DB とマイグレーション）に着手する。
 
 ---
 
@@ -222,7 +236,7 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 - [x] Phase 0 — 環境準備
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
 - [ ] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト）
-- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles/maintenance/dashboard 完成、次は auth**
+- [x] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **全完成（date/shaken/vehicles/maintenance/dashboard/auth）**
 - [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
 - [ ] Phase 5 — 車両 CRUD
 - [ ] Phase 6 — 整備記録 CRUD
