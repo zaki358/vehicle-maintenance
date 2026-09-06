@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>build-summary.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>build-summary.ts</h1>
+    <div class="doc-path">src/features/dashboard/lib/build-summary.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ダッシュボード（および車両詳細ページ）に表示する「車両ごとのまとめ」を
+      組み立てる純粋関数です。車両1台分の情報（車種名・区分・車検満了日）と
+      整備記録一覧から、<strong>車検アラートの段階</strong>・<strong>現在の
+      走行距離</strong>・<strong>直近整備からの経過</strong>をまとめた
+      1つのオブジェクトを作ります。
+    </p>
+    <p>
+      実装プランの設計判断どおり、<code>vehicles.current_odometer</code> の
+      ようなカラムは持たず（記録の編集・削除で値がずれるため）、常に
+      整備記録の <code>odometerKm</code> の最大値から現在の走行距離を
+      その場で導出します。この「導出」の実体がこのファイルです。
+    </p>
+    <p>
+      車検アラートの判定自体は <code>shaken/lib/alert-tier.ts</code>
+      に、直近整備の算出は同じディレクトリの
+      <code>since-last-service.ts</code> に委譲し、このファイルは
+      それらを1台の車両分・複数台分にまとめる「組み立て役」に徹しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>SummaryVehicle</code></td><td>type（export）</td><td>サマリー作成に必要な車両の最小限の情報</td></tr>
+        <tr><td><code>SummaryRecord</code></td><td>type（export）</td><td>サマリー作成に必要な整備記録の最小限の情報</td></tr>
+        <tr><td><code>VehicleSummary</code></td><td>type（export）</td><td>組み立て後の1台分のサマリー</td></tr>
+        <tr><td><code>buildVehicleSummary</code></td><td>function（export）</td><td>車両1台分のサマリーを組み立てる</td></tr>
+        <tr><td><code>buildVehicleSummaries</code></td><td>function（export）</td><td>複数車両分のサマリーを配列で組み立てる</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type SummaryVehicle = {
+  id: string
+  name: string
+  vehicleType: VehicleType
+  shakenExpiryDate: DateString | null
+}
+
+export type SummaryRecord = {
+  vehicleId: string
+  performedOn: DateString
+  odometerKm: number | null
+}
+
+export type VehicleSummary = {
+  vehicleId: string
+  name: string
+  vehicleType: VehicleType
+  shakenTier: ShakenAlertTier
+  currentOdometerKm: number | null
+  lastService: LastServiceInfo | null
+}</code></pre>
+      <p>
+        <code>SummaryVehicle</code> / <code>SummaryRecord</code> は、
+        DB から取得する行の完全な型ではなく「このファイルが実際に必要とする
+        フィールドだけ」を持つ最小限の型です。呼び出し側は、より多くの
+        フィールドを持つ実際のデータ（例えば整備記録の <code>note</code>
+        や <code>partDetail</code>）をそのまま渡しても問題なく動きます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function buildVehicleSummary(
+  vehicle: SummaryVehicle,
+  records: readonly SummaryRecord[],
+  today: DateString,
+): VehicleSummary {
+  const vehicleRecords = records.filter((record) =&gt; record.vehicleId === vehicle.id)
+  const odometerReadings = vehicleRecords
+    .map((record) =&gt; record.odometerKm)
+    .filter((odometerKm): odometerKm is number =&gt; odometerKm !== null)
+
+  return {
+    vehicleId: vehicle.id,
+    name: vehicle.name,
+    vehicleType: vehicle.vehicleType,
+    shakenTier: shakenAlertTier(vehicle.shakenExpiryDate, today),
+    currentOdometerKm: odometerReadings.length === 0 ? null : Math.max(...odometerReadings),
+    lastService: sinceLastService(vehicleRecords, today),
+  }
+}</code></pre>
+      <p>
+        <strong>1. 対象車両の記録だけに絞る</strong> —
+        <code>records</code> には呼び出し側から複数車両分の記録が
+        まとめて渡されることを想定し、まず <code>vehicle.id</code> に
+        一致するものだけに絞り込みます。こうすることで、呼び出し側は
+        車両ごとにフィルタ済みの配列を用意する手間が不要になります。
+      </p>
+      <p>
+        <strong>2. 現在の走行距離を導出する</strong> —
+        <code>odometerKm</code> は整備記録ごとに未入力（<code>null</code>）
+        もあり得るため、まず <code>null</code> を除外してから
+        <code>Math.max</code> で最大値を取ります。1件も無ければ
+        （<code>odometerReadings.length === 0</code>）、「まだ走行距離の
+        記録が無い」ことを表す <code>null</code> を返します。
+        <code>filter</code> の型ガード（<code>odometerKm is number</code>）に
+        より、この後の <code>Math.max(...odometerReadings)</code> の型が
+        <code>number[]</code> として扱われます。
+      </p>
+      <p>
+        <strong>3. 車検アラートと直近整備を委譲する</strong> —
+        <code>shakenAlertTier</code>（<code>shaken/lib</code>）と
+        <code>sinceLastService</code>（同じディレクトリ）は、それぞれ
+        既にテスト済みのロジックなので、ここでは呼び出すだけに留め、
+        判定条件を重複させません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function buildVehicleSummaries(
+  vehicles: readonly SummaryVehicle[],
+  records: readonly SummaryRecord[],
+  today: DateString,
+): VehicleSummary[] {
+  return vehicles.map((vehicle) =&gt; buildVehicleSummary(vehicle, records, today))
+}</code></pre>
+      <p>
+        ダッシュボード画面では車両を1台ずつではなく一覧で表示するため、
+        こちらが実際の呼び出し口になります。全車両分の記録
+        <code>records</code> をまとめて受け取り、車両ごとの絞り込みは
+        <code>buildVehicleSummary</code> 側に任せる形にすることで、
+        呼び出し側（ルート/サーバー関数）は「車両一覧」と「記録一覧」を
+        そのまま渡すだけで済みます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/dashboard/lib/build-summary.ts
+  </footer>
+
+</div>
+</body>
+</html>

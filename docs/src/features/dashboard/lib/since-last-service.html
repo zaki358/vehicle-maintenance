@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>since-last-service.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>since-last-service.ts</h1>
+    <div class="doc-path">src/features/dashboard/lib/since-last-service.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ある車両の整備記録一覧から、「直近の整備がいつだったか」「そこから何日
+      経っているか」を求める純粋関数です。ダッシュボードで「最終整備から
+      97日経過」のような表示をするための土台になります。
+    </p>
+    <p>
+      「直近」の判定は実施日（<code>performedOn</code>）の最大値で行うため、
+      呼び出し側があらかじめ日付順に並べておく必要はありません。作業内容
+      （オイル交換かタイヤ交換かなど）による絞り込みは行わず、渡された記録
+      全体から最新の1件を見るだけです。作業内容ごとの「最終○○」が必要なら、
+      呼び出し側で <code>filter-records.ts</code> の <code>workType</code> 条件で
+      先に絞り込んでから渡す設計です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>LastServiceInfo</code></td><td>type（export）</td><td>直近整備の実施日と、今日までの経過日数</td></tr>
+        <tr><td><code>sinceLastService</code></td><td>function（export）</td><td>記録一覧から直近整備の情報を求める</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type LastServiceInfo = {
+  lastPerformedOn: DateString
+  daysSince: number
+}
+
+type ServiceRecord = {
+  performedOn: DateString
+}</code></pre>
+      <p>
+        <code>ServiceRecord</code> は「実施日さえ持っていればよい」という
+        最小限の構造型です。整備記録の完全な型に依存しないことで、
+        呼び出し側は実際の記録オブジェクト（作業内容や部品情報などを
+        含む、より大きな型）をそのまま渡せます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function sinceLastService&lt;T extends ServiceRecord&gt;(
+  records: readonly T[],
+  today: DateString,
+): LastServiceInfo | null {
+  if (records.length === 0) {
+    return null
+  }
+
+  const lastPerformedOn = records.reduce&lt;DateString&gt;(
+    (latest, record) =&gt; (record.performedOn &gt; latest ? record.performedOn : latest),
+    records[0].performedOn,
+  )
+
+  return {
+    lastPerformedOn,
+    daysSince: daysBetween(lastPerformedOn, today),
+  }
+}</code></pre>
+      <p>
+        <strong>記録が0件の場合</strong> — 車両を登録したばかりでまだ整備記録が
+        無いケースを表すため、<code>null</code> を返します。呼び出し側は
+        「まだ記録がありません」のような表示に分岐できます。
+      </p>
+      <p>
+        <strong>最新の実施日を求める</strong> — <code>reduce</code> で
+        <code>records</code> を1件ずつ見ながら、それまでの最大値
+        （<code>latest</code>）より新しければ更新していきます。
+        <code>DateString</code> はゼロ埋めされた <code>YYYY-MM-DD</code> 形式
+        （<code>date-string.ts</code> 参照）なので、文字列の <code>&gt;</code>
+        比較がそのまま日付の新旧比較になり、<code>Date</code> への変換は
+        不要です。
+      </p>
+      <p>
+        <strong>経過日数の算出</strong> — 見つかった最新の実施日と
+        <code>today</code> の差を <code>date-string.ts</code> の
+        <code>daysBetween</code> に委譲します。日数計算のロジックを
+        このファイルに重複させないためです。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/dashboard/lib/since-last-service.ts
+  </footer>
+
+</div>
+</body>
+</html>

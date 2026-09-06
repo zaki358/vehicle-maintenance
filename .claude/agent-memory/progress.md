@@ -3,16 +3,17 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06（`features/maintenance/lib` 完成）
+最終更新: 2026-09-06(dashboard/lib 完成)（`features/maintenance/lib` 完成）
 
 ---
 
 ## 現在地
 
-**Phase 1 完了。Phase 3（純粋ロジック）終盤。**
+**Phase 1 完了。Phase 3（純粋ロジック）残るは auth/lib のみ。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
-`src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）
-がすべて TDD で完成し、**175 テスト・カバレッジ全指標 100%**。
+`src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
+`src/features/dashboard/lib/*`（2ファイル）がすべて TDD で完成し、
+**185 テスト・カバレッジ全指標 100%**。
 専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
@@ -91,6 +92,15 @@
 - [x] **`src/features/maintenance/lib/odometer.ts` 完成** — `isOdometerRegression`。走行距離の逆行警告
       （同日以前の記録より少ない／同日以降の記録より多い、の両方向を判定）。8テスト
 - [x] **maintenance/lib 6ファイル＋date-string-schema.tsの解説ドキュメント生成完了**
+- [x] **`src/features/dashboard/lib/since-last-service.ts` 完成** — `sinceLastService`。実施日
+      （`performedOn`）だけを持つ記録の配列から、最新の実施日と今日までの経過日数を求める。
+      作業内容での絞り込みは行わず、必要なら呼び出し側で`filter-records.ts`を先にかける設計。4テスト
+- [x] **`src/features/dashboard/lib/build-summary.ts` 完成** — `buildVehicleSummary` /
+      `buildVehicleSummaries`。車両1台分（区分・車検満了日）と整備記録一覧から、
+      `shakenAlertTier`（shaken/lib）・現在の走行距離(`odometerKm`の最大値から導出。
+      `vehicles.current_odometer`列は持たない設計方針どおり)・`sinceLastService`をまとめた
+      ダッシュボード用サマリーを組み立てる。6テスト
+- [x] **dashboard/lib 2ファイルの解説ドキュメント生成完了** — `docs/src/features/dashboard/lib/*.html`
 
 ## 判断の記録
 
@@ -124,7 +134,7 @@ Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
 1. ~~**`features/vehicles/lib/*`**~~ — **完成済み**（`vehicle-schema.ts` / `vehicle-type.ts` / `shaken-required.ts`）
 2. ~~**`features/maintenance/lib/*`**~~ — **完成済み**（`work-types.ts` / `record-schema.ts` /
    `filter-records.ts` / `sort-records.ts` / `part-suggestions.ts` / `odometer.ts`）
-3. **`features/dashboard/lib/*`** — `since-last-service.ts`、`build-summary.ts`
+3. ~~**`features/dashboard/lib/*`**~~ — **完成済み**（`since-last-service.ts` / `build-summary.ts`）
 4. **`features/auth/lib/*`** — `login-schema.ts`（Zod）、`auth-errors.ts`
 
 そのあと **Phase 2（DB とマイグレーション）** — **依頼者の Supabase プロジェクト作成待ち**。
@@ -132,13 +142,14 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 175 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 185 テストが
 全て通り、カバレッジが崩れていないことを確認してから続きに着手すること
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-次は「次にやること」の 3番目 `features/dashboard/lib` から着手する。
+次は「次にやること」の 4番目 `features/auth/lib` から着手する。
 
 **中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`・
-`src/features/maintenance/lib/*` が完成し、コミット済み。次は `features/dashboard/lib` から着手する。
+`src/features/maintenance/lib/*`・`src/features/dashboard/lib/*` が完成し、コミット済み。
+次は `features/auth/lib` から着手する。
 
 ---
 
@@ -211,7 +222,7 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 - [x] Phase 0 — 環境準備
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
 - [ ] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト）
-- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles/maintenance 完成、次は dashboard**
+- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles/maintenance/dashboard 完成、次は auth**
 - [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
 - [ ] Phase 5 — 車両 CRUD
 - [ ] Phase 6 — 整備記録 CRUD
