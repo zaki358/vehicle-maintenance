@@ -25,7 +25,9 @@
     <p>
       使っている Zod は 4系で、<code>z.string().email()</code> のような書き方が
       廃止されるなど記法が変わっているため、実際にインストールされているバージョンの
-      挙動をコードで確認しながら実装しています。
+      挙動をコードで確認しながら実装しています。日付の検証自体は
+      <code>src/lib/date/date-string-schema.ts</code> に切り出されており、
+      整備記録のスキーマ（<code>record-schema.ts</code>）とも共有しています。
     </p>
   </section>
 
@@ -38,41 +40,12 @@
       <tbody>
         <tr><td><code>vehicleSchema</code></td><td>const（export）</td><td>車両フォーム入力を検証する Zod スキーマ</td></tr>
         <tr><td><code>VehicleInput</code></td><td>type（export）</td><td><code>vehicleSchema</code> から推論した入力の型</td></tr>
-        <tr><td><code>dateStringSchema</code></td><td>const（非公開）</td><td>文字列を検証して <code>DateString</code> に絞り込む内部スキーマ</td></tr>
       </tbody>
     </table>
   </section>
 
   <section class="doc-section">
     <h2>コード解説</h2>
-
-    <div class="doc-chunk">
-      <pre><code>const dateStringSchema = z.string().transform((value, ctx) => {
-  if (!isDateString(value)) {
-    ctx.addIssue({ code: 'custom', message: '日付は YYYY-MM-DD 形式で、実在する日付を指定してください' })
-    return z.NEVER
-  }
-  return value
-})</code></pre>
-      <p>
-        満了日の検証に使う内部スキーマです。ただの正規表現ではなく、
-        <code>src/lib/date/date-string.ts</code> の <code>isDateString</code> を
-        そのまま呼び出しています。これにより「形式は <code>YYYY-MM-DD</code> だが
-        <code>2026-02-30</code> のように実在しない日付」も、日付ロジック側と
-        まったく同じ基準ではじけます。判定ルールを2箇所に別々に書いて
-        ズレるリスクを避けるための共有です。
-      </p>
-      <p>
-        <code>.refine()</code>ではなく<code>.transform()</code> を使っているのは、
-        検証に通った後の値を <code>DateString</code>（ブランド型）として
-        扱いたいためです。<code>isDateString</code> は TypeScript の型ガード
-        （<code>value is DateString</code>）なので、<code>if</code> 文を通過した後の
-        <code>return value</code> は自動的に <code>DateString</code> 型として
-        推論されます。検証に失敗した場合は <code>ctx.addIssue</code> でエラーを
-        積んだ上で <code>z.NEVER</code> を返し、Zod にこの入力が無効であることを
-        伝えます。
-      </p>
-    </div>
 
     <div class="doc-chunk">
       <pre><code>export const vehicleSchema = z.object({
@@ -104,8 +77,8 @@
         の <code>VehicleType</code> 型と対応しています。
       </p>
       <p>
-        <strong><code>shakenExpiryDate</code></strong> — 上で定義した
-        <code>dateStringSchema</code> を <code>.nullable()</code> でラップしています。
+        <strong><code>shakenExpiryDate</code></strong> — <code>src/lib/date/date-string-schema.ts</code>
+        の共有スキーマを <code>.nullable()</code> でラップしています。
         <code>null</code> は「250cc以下のバイクなど車検制度の対象外」を表す
         正常値であり、エラーにはしません（判定は
         <code>shaken-required.ts</code> の役割）。

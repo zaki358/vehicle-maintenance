@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>part-suggestions.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>part-suggestions.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/part-suggestions.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の「部品/型式」欄は単一の自由入力欄ですが、過去に入力した値から
+      候補を出すことで入力の手間を減らします。このファイルは、過去の記録一覧と
+      現在の入力途中の文字列から、候補となる文字列の配列を作るだけの純粋関数です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>partSuggestions</code></td><td>function（export）</td><td>過去の部品/型式からサジェスト候補を作る</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function partSuggestions&lt;T extends PartDetailRecord&gt;(records: readonly T[], query = ''): string[] {
+  const trimmedQuery = query.trim()
+  const seen = new Set&lt;string&gt;()
+  const suggestions: string[] = []
+
+  for (const record of records) {
+    const detail = record.partDetail.trim()
+    if (detail === '' || seen.has(detail)) {
+      continue
+    }
+    if (trimmedQuery !== '' && !detail.includes(trimmedQuery)) {
+      continue
+    }
+    seen.add(detail)
+    suggestions.push(detail)
+  }
+
+  return suggestions
+}</code></pre>
+      <p>
+        <code>records</code> を先頭から順に見ていき、条件を満たすものだけを
+        <code>suggestions</code> に積んでいきます。
+      </p>
+      <p>
+        <strong>重複除去</strong> — <code>seen</code>（<code>Set</code>）に
+        追加済みの値を記録し、2回目以降に同じ値が出てきてもスキップします。
+        同じ部品を何度も使っていても候補には1回しか出ません。
+      </p>
+      <p>
+        <strong>登場順を保つ</strong> — 頻度順や五十音順に並べ替えるのではなく、
+        渡された配列の順序をそのまま使います。呼び出し側が
+        <code>sort-records.ts</code> で新しい順に並べた記録を渡せば、
+        「直近使った値ほど候補の上に来る」という自然な挙動になります。
+        並べ替えの責務をこの関数に持たせないことで、関数の役割を
+        「絞り込みと重複除去」だけに保っています。
+      </p>
+      <p>
+        <strong>空文字の除外</strong> — <code>detail === ''</code>（前後の空白を
+        trim した後）のものは候補にしません。未入力のまま保存された記録があっても
+        空の候補が出ないようにするためです。
+      </p>
+      <p>
+        <strong><code>query</code> による絞り込み</strong> — 空文字（既定値）なら
+        絞り込まず全候補を返し、何か入力されていればその文字列を含むものだけに
+        絞ります。前方一致ではなく部分一致（<code>String.includes</code>）にしているのは、
+        型式の途中の文字列で検索したいケース（例:「10W-40」で検索してオイル銘柄を
+        探す）を想定しているためです。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/part-suggestions.ts
+  </footer>
+
+</div>
+</body>
+</html>

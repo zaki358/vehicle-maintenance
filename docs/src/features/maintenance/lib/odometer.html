@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>odometer.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>odometer.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/odometer.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      走行距離は時間とともにしか増えないはず、という前提のもとで、新しく入力
+      しようとしている整備記録の走行距離が、その車両の既存の記録と矛盾していないか
+      （＝「逆行」していないか）を判定します。入力ミスの検知に使う、
+      整備記録フォームの警告表示の裏側のロジックです。
+    </p>
+    <p>
+      ここでの「矛盾」は単純な大小比較ではなく、<strong>日付</strong>と
+      <strong>走行距離</strong>の2軸で見る必要があります。この関数はその判定だけを
+      行い、実際に既存記録をどこから取得するか（DB・キャッシュなど）には
+      関与しません。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OdometerReading</code></td><td>type（export）</td><td>実施日と走行距離のペア</td></tr>
+        <tr><td><code>isOdometerRegression</code></td><td>function（export）</td><td>新しい入力が既存記録と矛盾（逆行）していないかを判定する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function isOdometerRegression(candidate: OdometerReading, otherRecords: readonly OdometerReading[]): boolean {
+  return otherRecords.some((other) => {
+    const otherIsEarlierOrSameDay = isOnOrBefore(other.performedOn, candidate.performedOn)
+    if (otherIsEarlierOrSameDay && other.odometerKm > candidate.odometerKm) {
+      return true
+    }
+
+    const otherIsLaterOrSameDay = isOnOrAfter(other.performedOn, candidate.performedOn)
+    if (otherIsLaterOrSameDay && other.odometerKm < candidate.odometerKm) {
+      return true
+    }
+
+    return false
+  })
+}</code></pre>
+      <p>
+        <code>candidate</code>（これから登録しようとしている記録）を、
+        <code>otherRecords</code>（同じ車両の既存記録。<code>candidate</code>
+        自身は呼び出し側であらかじめ除いておく想定）の1件ずつと比較し、
+        矛盾する記録が1件でもあれば <code>true</code> を返します。
+      </p>
+      <p>
+        矛盾には2方向あります。
+      </p>
+      <p>
+        <strong>1. <code>candidate</code> と同日以前の記録の方が走行距離が多い</strong> —
+        例えば1月に10,000kmだった記録があるのに、6月の記録として9,000kmを
+        入力しようとした場合。時間が進んでいるのに距離が減っているので矛盾です。
+      </p>
+      <p>
+        <strong>2. <code>candidate</code> と同日以降の記録の方が走行距離が少ない</strong> —
+        例えば9月に15,000kmの記録があるのに、6月の記録として20,000kmを
+        後から追加しようとした場合。未来の記録の方が距離が少ないことになり、
+        やはり矛盾です。
+      </p>
+      <p>
+        <code>isOnOrBefore</code> / <code>isOnOrAfter</code>（どちらも
+        <code>date-string.ts</code> 由来）は同日を含むため、同じ日付の記録同士も
+        両方の判定にかかります。これにより、同日に2件記録した場合でも
+        走行距離の大小関係がチェックされます（例: 同日に9,000kmと10,000kmの
+        記録が両方あれば、どちらの順で入力しても矛盾として検知されます）。
+      </p>
+      <p>
+        <code>Array.prototype.some</code> は最初に条件を満たした時点で
+        <code>true</code> を返し、それ以上の記録を調べません（短絡評価）。
+        既存記録が多い車両でも無駄な比較をしないための選択です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/odometer.ts
+  </footer>
+
+</div>
+</body>
+</html>

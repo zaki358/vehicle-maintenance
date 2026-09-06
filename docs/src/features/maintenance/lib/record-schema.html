@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>record-schema.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>record-schema.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/record-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録（日付・作業内容・走行距離・部品/型式・備考）の登録・編集フォーム
+      入力を検証する Zod スキーマです。<code>vehicle-schema.ts</code> と同様、
+      「全書き込みはサーバー関数の入口で Zod 検証する」というプロジェクト方針に
+      沿っています。
+    </p>
+    <p>
+      このファイルでいちばん重要なのは、単純なフィールド単位の検証では表現できない
+      「作業内容が『その他』のときだけ自由入力欄が必須になる」というルールです。
+      これは <code>.refine()</code> によるオブジェクト全体の相互検証で実現しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>recordSchema</code></td><td>const（export）</td><td>整備記録フォーム入力を検証する Zod スキーマ</td></tr>
+        <tr><td><code>RecordInput</code></td><td>type（export）</td><td><code>recordSchema</code> から推論した入力の型</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const recordSchema = z
+  .object({
+    performedOn: dateStringSchema,
+    workType: z.enum(WORK_TYPES, { error: '作業内容を選択してください' }),
+    workTypeOther: z
+      .string()
+      .trim()
+      .max(WORK_TYPE_OTHER_MAX_LENGTH, `作業内容は${WORK_TYPE_OTHER_MAX_LENGTH}文字以内で入力してください`)
+      .default(''),
+    odometerKm: z
+      .number()
+      .int('走行距離は整数で入力してください')
+      .nonnegative('走行距離は0以上で入力してください')
+      .nullable()
+      .default(null),
+    partDetail: z
+      .string()
+      .trim()
+      .max(PART_DETAIL_MAX_LENGTH, `部品/型式は${PART_DETAIL_MAX_LENGTH}文字以内で入力してください`)
+      .default(''),
+    note: z
+      .string()
+      .trim()
+      .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
+      .default(''),
+  })</code></pre>
+      <p>
+        フィールドごとの検証です。
+      </p>
+      <p>
+        <strong><code>performedOn</code></strong> — <code>src/lib/date/date-string-schema.ts</code>
+        の共有スキーマをそのまま使い、<code>vehicle-schema.ts</code> と同じ基準で
+        日付を検証します。
+      </p>
+      <p>
+        <strong><code>workType</code></strong> — <code>work-types.ts</code> の
+        <code>WORK_TYPES</code>（7つのプリセット）から選ばれた値だけを許可します。
+      </p>
+      <p>
+        <strong><code>odometerKm</code></strong> — 整数かつ0以上。<code>.nullable().default(null)</code>
+        により、フォームで未入力（<code>undefined</code>）でも「不明」を意味する
+        <code>null</code> として保存されます。前回記録との比較は
+        <code>odometer.ts</code> の役割で、ここでは単体の値としての妥当性だけを見ます。
+      </p>
+      <p>
+        <strong><code>workTypeOther</code> / <code>partDetail</code> / <code>note</code></strong> —
+        いずれも <code>.trim()</code> 後に文字数上限、未入力時は空文字が既定値です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  .refine((data) => !isOtherWorkType(data.workType) || data.workTypeOther.length > 0, {
+    message: '作業内容が「その他」の場合は内容を入力してください',
+    path: ['workTypeOther'],
+  })</code></pre>
+      <p>
+        「<code>workType</code> が <code>other</code>」と「<code>workTypeOther</code> が
+        空でない」という2フィールドにまたがる条件なので、単一フィールドの
+        <code>.min()</code> などでは表現できません。オブジェクト全体を検証する
+        <code>.refine()</code> を使い、条件式は
+        <code>!isOtherWorkType(...) || workTypeOther.length > 0</code>
+        —「その他でない、または、その他だが入力済み」という論理積の否定形です。
+        <code>work-types.ts</code> の <code>isOtherWorkType</code> をそのまま使うことで、
+        「その他かどうか」の判定基準がこのファイルとプリセット定義側でズレません。
+      </p>
+      <p>
+        <code>path: ['workTypeOther']</code> を指定しているのは、エラーメッセージを
+        フォームの <code>workTypeOther</code> 欄の下に表示できるようにするためです。
+        指定しないとエラーがオブジェクト全体（<code>path: []</code>）に紐づき、
+        どのフィールドが悪いのか画面側で判別しづらくなります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/record-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>

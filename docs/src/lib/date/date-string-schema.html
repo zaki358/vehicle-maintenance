@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>date-string-schema.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>date-string-schema.ts</h1>
+    <div class="doc-path">src/lib/date/date-string-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      フォーム入力の文字列を検証し、<code>date-string.ts</code> が定義する
+      <code>DateString</code>（実在する <code>YYYY-MM-DD</code> 形式であることが
+      保証された日付文字列）へ絞り込む Zod スキーマを1つだけ提供します。
+    </p>
+    <p>
+      車両の車検満了日、整備記録の実施日など、このアプリで日付を入力させる
+      フォームは複数ありますが、「本当にその日付が存在するか」（例:
+      <code>2026-02-30</code> は形式は正しく見えても存在しない）という検証ロジックを
+      各フォームのスキーマにそれぞれ書いてしまうと、判定基準が少しずつズレていく
+      リスクがあります。このファイルは <code>vehicle-schema.ts</code>
+      （車両）と <code>record-schema.ts</code>（整備記録）の両方から共有される、
+      日付検証の唯一の入り口です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>dateStringSchema</code></td><td>const（export）</td><td>文字列を検証して <code>DateString</code> に絞り込む Zod スキーマ</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const dateStringSchema = z.string().transform((value, ctx) => {
+  if (!isDateString(value)) {
+    ctx.addIssue({ code: 'custom', message: '日付は YYYY-MM-DD 形式で、実在する日付を指定してください' })
+    return z.NEVER
+  }
+  return value
+})</code></pre>
+      <p>
+        検証そのものは <code>date-string.ts</code> の <code>isDateString</code> に
+        丸ごと委譲しています。これにより「日付として実在するか」の判定基準は
+        <code>date-string.ts</code> の1箇所だけに存在し、Zod スキーマ側では
+        それを呼び出すだけになります。
+      </p>
+      <p>
+        <code>.refine()</code> ではなく <code>.transform()</code> を使っているのは、
+        検証を通過した値を <code>DateString</code>（ブランド型）として扱いたいためです。
+        <code>isDateString</code> は TypeScript の型ガード（<code>value is DateString</code>）
+        なので、<code>if (!isDateString(value))</code> を通過した後の
+        <code>return value</code> は自動的に <code>DateString</code> 型として推論されます。
+        検証に失敗した場合は <code>ctx.addIssue</code> でエラー内容を積んだ上で
+        <code>z.NEVER</code> を返し、Zod にこの入力が無効であることを伝えます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/date-string-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>

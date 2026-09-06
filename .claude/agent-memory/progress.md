@@ -3,16 +3,16 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06（`features/vehicles/lib` 完成）
+最終更新: 2026-09-06（`features/maintenance/lib` 完成）
 
 ---
 
 ## 現在地
 
-**Phase 1 完了。Phase 3（純粋ロジック）中盤まで完了。**
-`src/lib/date/*`（4ファイル）、`src/features/shaken/lib/*`（4ファイル）、
-`src/features/vehicles/lib/*`（3ファイル）がすべて TDD で完成し、
-**118 テスト・カバレッジ全指標 100%**。
+**Phase 1 完了。Phase 3（純粋ロジック）終盤。**
+`src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
+`src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）
+がすべて TDD で完成し、**175 テスト・カバレッジ全指標 100%**。
 専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
@@ -74,6 +74,23 @@
       note(trim+1000字+空文字デフォルト)。Zod 4の`.transform()`+`ctx.addIssue`+`z.NEVER`パターンと
       `z.enum(..., {error})`の記法をnode -eで実挙動確認してから実装。13テスト
 - [x] **vehicles/lib 3ファイルの解説ドキュメント生成完了** — `docs/src/features/vehicles/lib/*.html`
+- [x] **`src/lib/date/date-string-schema.ts` 完成** — `dateStringSchema`。`vehicle-schema.ts`
+      に元々あったZod日付検証を共通化して抽出（`record-schema.ts` と共有するため）。
+      `vehicle-schema.ts` はこれをimportする形にリファクタし、テスト・型・lintを再確認済み。4テスト
+- [x] **`src/features/maintenance/lib/work-types.ts` 完成** — `WORK_TYPES`（7プリセット、`as const`）、
+      `workTypeLabel`、`isOtherWorkType`。10テスト
+- [x] **`src/features/maintenance/lib/record-schema.ts` 完成** — `recordSchema`（Zod）。
+      performedOn(共有dateStringSchema)/workType(enum)/workTypeOther/odometerKm(int・0以上・null許容)/
+      partDetail/note。**「その他」選択時はworkTypeOther必須**というルールを`.refine()`＋`path`で実装。13テスト
+- [x] **`src/features/maintenance/lib/filter-records.ts` 完成** — `filterRecords`。vehicleId/workType/
+      日付範囲(from・to)で絞り込む。ジェネリクスで最小限の構造型のみ要求。9テスト
+- [x] **`src/features/maintenance/lib/sort-records.ts` 完成** — `sortRecords`（newest/oldest既定newest）。
+      同日レコードの安定ソート(compareAscで0を返す分岐)もカバレッジ100%のためテスト追加。6テスト
+- [x] **`src/features/maintenance/lib/part-suggestions.ts` 完成** — `partSuggestions`。過去の部品/型式を
+      重複除去・登場順維持でサジェスト、queryで部分一致絞り込み。7テスト
+- [x] **`src/features/maintenance/lib/odometer.ts` 完成** — `isOdometerRegression`。走行距離の逆行警告
+      （同日以前の記録より少ない／同日以降の記録より多い、の両方向を判定）。8テスト
+- [x] **maintenance/lib 6ファイル＋date-string-schema.tsの解説ドキュメント生成完了**
 
 ## 判断の記録
 
@@ -105,10 +122,8 @@
 Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
 
 1. ~~**`features/vehicles/lib/*`**~~ — **完成済み**（`vehicle-schema.ts` / `vehicle-type.ts` / `shaken-required.ts`）
-2. **`features/maintenance/lib/*`** — `work-types.ts`（プリセット定義：エンジンオイル/
-   オイルエレメント/タイヤ/ブレーキパッド/バッテリー/車検/その他）、`record-schema.ts`
-   （「その他」選択時は自由入力必須というルールを Zod で表現）、`filter-records.ts`、
-   `sort-records.ts`、`part-suggestions.ts`、`odometer.ts`
+2. ~~**`features/maintenance/lib/*`**~~ — **完成済み**（`work-types.ts` / `record-schema.ts` /
+   `filter-records.ts` / `sort-records.ts` / `part-suggestions.ts` / `odometer.ts`）
 3. **`features/dashboard/lib/*`** — `since-last-service.ts`、`build-summary.ts`
 4. **`features/auth/lib/*`** — `login-schema.ts`（Zod）、`auth-errors.ts`
 
@@ -117,13 +132,13 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 118 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 175 テストが
 全て通り、カバレッジが崩れていないことを確認してから続きに着手すること
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-次は「次にやること」の 2番目 `features/maintenance/lib` から着手する。
+次は「次にやること」の 3番目 `features/dashboard/lib` から着手する。
 
-**中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`
-が完成し、コミット済み。次は `features/maintenance/lib` から着手する。
+**中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`・
+`src/features/maintenance/lib/*` が完成し、コミット済み。次は `features/dashboard/lib` から着手する。
 
 ---
 
@@ -196,7 +211,7 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 - [x] Phase 0 — 環境準備
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
 - [ ] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト）
-- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles 完成、次は maintenance**
+- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles/maintenance 完成、次は dashboard**
 - [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
 - [ ] Phase 5 — 車両 CRUD
 - [ ] Phase 6 — 整備記録 CRUD

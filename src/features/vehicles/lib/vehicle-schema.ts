@@ -1,21 +1,9 @@
 import { z } from 'zod'
 
-import { isDateString } from '@/lib/date/date-string'
+import { dateStringSchema } from '@/lib/date/date-string-schema'
 
 const NAME_MAX_LENGTH = 50
 const NOTE_MAX_LENGTH = 1000
-
-/**
- * `YYYY-MM-DD` かつ実在する日付の文字列を DateString として受理する。
- * `isDateString` は date-string.ts と同じ検証（うるう年・月末日など）を共有する。
- */
-const dateStringSchema = z.string().transform((value, ctx) => {
-  if (!isDateString(value)) {
-    ctx.addIssue({ code: 'custom', message: '日付は YYYY-MM-DD 形式で、実在する日付を指定してください' })
-    return z.NEVER
-  }
-  return value
-})
 
 /**
  * 車両の登録・編集フォーム入力を検証するスキーマ。

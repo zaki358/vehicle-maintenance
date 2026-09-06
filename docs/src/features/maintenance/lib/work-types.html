@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>work-types.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>work-types.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/work-types.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の「作業内容」プリセット（エンジンオイル、オイルエレメント、タイヤ、
+      ブレーキパッド、バッテリー、車検、その他）を定義するファイルです。
+      このプリセットは DB の <code>work_type</code> 列にそのまま保存する値なので、
+      画面・スキーマ検証・DBのどこから見ても同じ値の集合を参照できるよう、
+      ここで一度だけ定義しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>WORK_TYPES</code></td><td>const（export）</td><td>作業内容プリセット7種類の配列</td></tr>
+        <tr><td><code>WorkType</code></td><td>type（export）</td><td><code>WORK_TYPES</code> の要素から推論した文字列リテラル型</td></tr>
+        <tr><td><code>workTypeLabel</code></td><td>function（export）</td><td>プリセット値から日本語ラベルを返す</td></tr>
+        <tr><td><code>isOtherWorkType</code></td><td>function（export）</td><td>「その他」が選ばれているかを判定する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const WORK_TYPES = [
+  'engine_oil',
+  'oil_element',
+  'tire',
+  'brake_pad',
+  'battery',
+  'shaken',
+  'other',
+] as const
+
+export type WorkType = (typeof WORK_TYPES)[number]</code></pre>
+      <p>
+        値の一覧を配列リテラルとして定義し、そこから型を逆算しています。
+        <code>as const</code> を付けることで配列の各要素が広い <code>string</code>
+        ではなく個々のリテラル型として扱われ、<code>(typeof WORK_TYPES)[number]</code>
+        で「配列の要素のどれか」というユニオン型を取り出せます。値の一覧と型の
+        2箇所を手で同期させる必要が無くなるのが利点です。
+      </p>
+      <p>
+        この配列はそのまま <code>record-schema.ts</code> の
+        <code>z.enum(WORK_TYPES, ...)</code> にも渡され、Zod の検証対象にもなります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function workTypeLabel(type: WorkType): string {
+  switch (type) {
+    case 'engine_oil':
+      return 'エンジンオイル'
+    case 'oil_element':
+      return 'オイルエレメント'
+    case 'tire':
+      return 'タイヤ'
+    case 'brake_pad':
+      return 'ブレーキパッド'
+    case 'battery':
+      return 'バッテリー'
+    case 'shaken':
+      return '車検'
+    case 'other':
+      return 'その他'
+  }
+}</code></pre>
+      <p>
+        画面表示用の日本語ラベルに変換するだけの関数です。<code>switch</code> が
+        <code>WorkType</code> の全パターンを網羅しているため、将来
+        <code>WORK_TYPES</code> に値を追加した際は、この <code>switch</code> の
+        分岐を足し忘れると TypeScript が「網羅していない」というエラーで
+        教えてくれます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function isOtherWorkType(type: WorkType): boolean {
+  return type === 'other'
+}</code></pre>
+      <p>
+        「その他」が選ばれているかどうかを判定するだけの小さな関数ですが、
+        独立させているのには理由があります。「その他」を選んだときだけ
+        自由入力欄（<code>work_type_other</code>）が必須になるという業務ルールが
+        あり、このルールは <code>record-schema.ts</code> の検証、
+        フォームコンポーネントの表示切り替えなど複数箇所から参照されます。
+        <code>type === 'other'</code> という比較を各所に直接書くのではなく、
+        名前の付いた関数にすることで「なぜその判定をしているか」がコードだけで
+        伝わるようにしています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/work-types.ts
+  </footer>
+
+</div>
+</body>
+</html>

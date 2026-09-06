@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sort-records.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>sort-records.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/sort-records.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の一覧を実施日順に並べ替える関数です。デフォルトは新しい順
+      （直近の整備が最初に来る、一覧表示で自然な並び）で、古い順への切り替えにも
+      対応します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RecordSortOrder</code></td><td>type（export）</td><td>並び順: <code>'newest'</code> または <code>'oldest'</code></td></tr>
+        <tr><td><code>sortRecords</code></td><td>function（export）</td><td>実施日で並べ替えた新しい配列を返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function sortRecords&lt;T extends SortableRecord&gt;(
+  records: readonly T[],
+  order: RecordSortOrder = 'newest',
+): T[] {
+  const compareAsc = (a: T, b: T): number => {
+    if (a.performedOn < b.performedOn) return -1
+    if (a.performedOn > b.performedOn) return 1
+    return 0
+  }
+  return [...records].sort(order === 'oldest' ? compareAsc : (a, b) => compareAsc(b, a))
+}</code></pre>
+      <p>
+        <code>DateString</code> はゼロ埋めされた <code>YYYY-MM-DD</code> 形式であることが
+        保証されているため（<code>date-string.ts</code> 参照）、<code>&lt;</code> /
+        <code>&gt;</code> による文字列比較がそのまま日付の前後関係と一致します。
+        <code>Date</code> オブジェクトへの変換は不要です。
+      </p>
+      <p>
+        <code>compareAsc</code> は「昇順（古い順）」の比較関数です。等しい場合に
+        <code>0</code> を返すことを明示しているのがポイントで、これが無いと
+        同じ日付の記録同士の並びが安定しません（<code>Array.prototype.sort</code>
+        は比較関数が一貫した結果を返すことを前提にしているため）。
+      </p>
+      <p>
+        新しい順（<code>'newest'</code>）が欲しいときは、<code>compareAsc(a, b)</code>
+        ではなく引数を入れ替えた <code>compareAsc(b, a)</code> を渡しています。
+        比較関数をもう1つ書く代わりに、既存の比較関数の引数を反転させるだけで
+        逆順を作れるという典型的なテクニックです。
+      </p>
+      <p>
+        <code>[...records]</code> でコピーしてから <code>.sort()</code> しているのは、
+        <code>Array.prototype.sort</code> が破壊的（元の配列を書き換える）メソッドだからです。
+        呼び出し元が渡した配列を書き換えない（不変性を保つ）ために必須の一手間です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/sort-records.ts
+  </footer>
+
+</div>
+</body>
+</html>
