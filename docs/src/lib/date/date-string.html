@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>date-string.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>date-string.ts</h1>
+    <div class="doc-path">src/lib/date/date-string.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      「日付だけ」（時刻を持たない日付）を安全に扱うための型と演算をまとめたファイルです。
+      車検の満了日や整備した日など、このアプリが扱う日付はすべて時刻を持ちません。
+    </p>
+    <p>
+      このファイルが存在する理由は、<strong>タイムゾーンによる 1 日のズレを根本から断つため</strong>です。
+      このアプリは Cloudflare Workers 上で動きますが、Workers のタイムゾーンは常に UTC で、
+      利用者のスマホは JST（UTC+9）です。つまり毎日 00:00〜09:00 JST の 9 時間は、
+      サーバーが考える「今日」と利用者が考える「今日」が 1 日ずれます。
+    </p>
+    <p>
+      加えて JavaScript の <code>new Date('2026-09-06')</code> は、仕様上 UTC の深夜0時として解釈されます。
+      この 2 つが噛み合うと、<strong>「車検まであと 31 日」と表示された画面が、
+      直後に 30 日へ書き換わる</strong>という現象が起きます。React は警告を出さないため気づけません。
+    </p>
+    <p>
+      対策として、この層では <strong>Date インスタンスを原則として作らず</strong>、
+      <code>YYYY-MM-DD</code> という文字列と整数の計算だけでカレンダー演算を行います。
+      日本語での表示整形（「2026年9月6日(土)」など）は別ファイル（format-ja.ts）に隔離します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>DateString</code></td><td>type（export）</td><td>検証済みの <code>YYYY-MM-DD</code> 文字列を表すブランド型</td></tr>
+        <tr><td><code>isDateString</code></td><td>function（export）</td><td>形式と実在性を判定する型ガード</td></tr>
+        <tr><td><code>toDateString</code></td><td>function（export）</td><td>検証して <code>DateString</code> に変換。不正なら例外</td></tr>
+        <tr><td><code>toUtcMillis</code></td><td>function（export）</td><td>UTC 深夜0時基準のミリ秒（通日番号として使う）</td></tr>
+        <tr><td><code>daysBetween</code></td><td>function（export）</td><td>2 日付の間の日数。過去なら負の数</td></tr>
+        <tr><td><code>isOnOrAfter</code></td><td>function（export）</td><td>同日を含めて以降かを判定</td></tr>
+        <tr><td><code>isOnOrBefore</code></td><td>function（export）</td><td>同日を含めて以前かを判定</td></tr>
+        <tr><td><code>isLeapYear</code></td><td>function（内部）</td><td>うるう年判定</td></tr>
+        <tr><td><code>daysInMonth</code></td><td>function（内部）</td><td>その年月の日数を返す</td></tr>
+        <tr><td><code>split</code></td><td>function（内部）</td><td>文字列を年・月・日の数値に分解</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type DateString = string &amp; { readonly __brand: 'DateString' }
+
+const PATTERN = /^\d{4}-\d{2}-\d{2}$/</code></pre>
+      <p>
+        <code>DateString</code> は「検証を通過した日付文字列」を表す型です。実体はただの文字列ですが、
+        <code>__brand</code> という架空のプロパティを型の上でだけ付け足すことで、
+        <strong>普通の <code>string</code> を代入できなくしています</strong>（ブランド型と呼ばれる手法）。
+      </p>
+      <p>
+        これにより、DB から来た生の文字列やユーザーが入力した文字列が、
+        検証を通らずに計算へ流れ込むのを型検査の段階で止められます。
+        また <code>YYYY-MM-DD</code> はゼロ埋めが保証されるため、
+        <strong>辞書順の文字列比較がそのまま日付の前後比較として使える</strong>という利点もあります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
+
+const MILLIS_PER_DAY = 86_400_000
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 &amp;&amp; year % 100 !== 0) || year % 400 === 0
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    return isLeapYear(year) ? 29 : 28
+  }
+  return DAYS_IN_MONTH[month - 1]
+}</code></pre>
+      <p>
+        月ごとの日数を求める内部関数です。うるう年の判定は
+        「4 で割り切れる、ただし 100 で割り切れる年は除く、ただし 400 で割り切れる年は含む」
+        という正式な規則をそのまま実装しています（2000 年はうるう年、1900 年は違う）。
+      </p>
+      <p>
+        ここで <code>Date</code> を使わず自前で計算しているのは、このファイルの方針である
+        「カレンダー計算に <code>Date</code> を持ち込まない」を貫くためです。
+        整数演算だけなので、実行環境のタイムゾーンに一切影響されません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>type DateParts = { year: number; month: number; day: number }
+
+function split(date: string): DateParts {
+  return {
+    year: Number(date.slice(0, 4)),
+    month: Number(date.slice(5, 7)),
+    day: Number(date.slice(8, 10)),
+  }
+}</code></pre>
+      <p>
+        <code>"2026-09-06"</code> を <code>{ year: 2026, month: 9, day: 6 }</code> に分解します。
+        位置が固定されている前提で <code>slice</code> しているのは、
+        呼び出し前に必ず正規表現で形式を確認しているためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function isDateString(value: string): value is DateString {
+  if (!PATTERN.test(value)) {
+    return false
+  }
+  const { year, month, day } = split(value)
+  if (month &lt; 1 || month &gt; 12) {
+    return false
+  }
+  return day &gt;= 1 &amp;&amp; day &lt;= daysInMonth(year, month)
+}</code></pre>
+      <p>
+        形式が <code>YYYY-MM-DD</code> であることに加えて、<strong>実在する日付かどうかまで判定します</strong>。
+        戻り値の型が <code>value is DateString</code> になっているため、
+        この関数が <code>true</code> を返した後は TypeScript が自動的に型を <code>DateString</code> として扱います。
+      </p>
+      <p>
+        実在性まで見るのが重要な点です。<code>2026-02-30</code> や
+        <code>2026-02-29</code>（2026 年はうるう年ではない）は形式上は正しく見えますが、
+        通してしまうと後続の計算結果が静かにずれます。
+        「なぜか車検の残り日数がおかしい」という追いにくいバグの発生源になるため、ここで弾きます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function toDateString(value: string): DateString {
+  if (!isDateString(value)) {
+    throw new Error(`日付として解釈できません: ${value}（YYYY-MM-DD 形式で、実在する日付である必要があります）`)
+  }
+  return value
+}</code></pre>
+      <p>
+        検証を通したうえで <code>DateString</code> に変換します。不正な値では <strong>例外を投げます</strong>。
+      </p>
+      <p>
+        <code>null</code> を返したりデフォルト値で誤魔化したりしないのは意図的です。
+        不正な日付が混入したまま計算が続くと、エラーは出ないのに結果だけが間違うという
+        最も追いにくい種類のバグになります。ここで止めて、原因の場所で気づけるようにします。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function toUtcMillis(date: DateString): number {
+  const { year, month, day } = split(date)
+  const millis = Date.UTC(year, month - 1, day)
+
+  if (year &lt; 100) {
+    const corrected = new Date(millis)
+    corrected.setUTCFullYear(year)
+    return corrected.getTime()
+  }
+  return millis
+}</code></pre>
+      <p>
+        日付を「UTC 深夜0時からのミリ秒」に変換します。これは<strong>時刻として使う値ではなく、
+        日数を数えるための通し番号として使う値</strong>です。両辺とも UTC の深夜0時に揃うため、
+        差を取れば夏時間もタイムゾーンも介在せず、正確な日数になります。
+      </p>
+      <p>
+        後半の <code>if (year &lt; 100)</code> は <code>Date.UTC</code> の仕様への対処です。
+        <code>Date.UTC(26, 0, 1)</code> は 26 年ではなく <strong>1926 年</strong>として解釈されます。
+        正規表現が 4 桁の年を許すため <code>0026-01-01</code> のような値が届く可能性があり、
+        <code>setUTCFullYear</code> で明示的に補正しています。
+        実用上まず起きませんが、静かに 1900 年ずれるより明示的に潰すほうが安全です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function daysBetween(from: DateString, to: DateString): number {
+  return Math.round((toUtcMillis(to) - toUtcMillis(from)) / MILLIS_PER_DAY)
+}</code></pre>
+      <p>
+        2 つの日付の間の日数を返します。<code>to</code> が過去の場合は負の数になります。
+        <strong>車検の残り日数はこの関数で求めます</strong>。0 なら当日が満了日、負なら期限切れです。
+      </p>
+      <p>
+        <code>Math.round</code> は本来不要です（両辺とも深夜0時なので割り算は必ず割り切れます）が、
+        浮動小数点演算の誤差に対する保険として付けています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function isOnOrAfter(date: DateString, other: DateString): boolean {
+  return date &gt;= other
+}
+
+export function isOnOrBefore(date: DateString, other: DateString): boolean {
+  return date &lt;= other
+}</code></pre>
+      <p>
+        日付の前後を比較します。中身は単なる文字列比較です。
+        これが正しく動くのは、<code>YYYY-MM-DD</code> が<strong>固定長でゼロ埋めされている</strong>ため、
+        辞書順が日付順と一致するからです（<code>"2025-12-31" &lt; "2026-01-01"</code>）。
+      </p>
+      <p>
+        わざわざ関数にしているのは可読性のためです。コードの中に <code>a &gt;= b</code> と書かれていても
+        日付の比較だと読み取りにくいですが、<code>isOnOrAfter(today, expiry)</code> なら意図が明確になります。
+        また、この関数を経由させることで「比較していい値は検証済みの <code>DateString</code> だけ」
+        という制約も型で効かせられます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/date-string.ts
+  </footer>
+
+</div>
+</body>
+</html>

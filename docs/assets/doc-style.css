@@ -1,0 +1,133 @@
+/* Shared stylesheet for generated source-code documentation pages.
+   Created once at docs/assets/doc-style.css — if it already exists in a
+   project, it is left untouched (it may have been customized). */
+
+:root {
+  --doc-bg: #ffffff;
+  --doc-fg: #1f2328;
+  --doc-muted: #57606a;
+  --doc-border: #d0d7de;
+  --doc-accent: #0969da;
+  --doc-code-bg: #f6f8fa;
+  --doc-code-fg: #24292f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--doc-bg);
+  color: var(--doc-fg);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+.doc-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.doc-header {
+  border-bottom: 1px solid var(--doc-border);
+  padding-bottom: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.doc-header h1 {
+  font-size: 1.6rem;
+  margin: 0 0 0.35rem;
+  word-break: break-all;
+}
+
+.doc-path {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--doc-muted);
+}
+
+.doc-section {
+  margin: 2rem 0;
+}
+
+.doc-section h2 {
+  font-size: 1.15rem;
+  border-left: 4px solid var(--doc-accent);
+  padding-left: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.doc-section h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.4rem;
+}
+
+table.doc-structure {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+table.doc-structure th,
+table.doc-structure td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--doc-border);
+  vertical-align: top;
+}
+
+table.doc-structure th {
+  color: var(--doc-muted);
+  font-weight: 600;
+}
+
+table.doc-structure code {
+  font-size: 0.88rem;
+}
+
+.doc-chunk {
+  margin: 1.5rem 0;
+}
+
+.doc-chunk pre {
+  background: var(--doc-code-bg);
+  color: var(--doc-code-fg);
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 0.6rem;
+}
+
+.doc-chunk pre code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.doc-chunk p {
+  margin: 0.4rem 0;
+}
+
+.doc-footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--doc-border);
+  color: var(--doc-muted);
+  font-size: 0.8rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --doc-bg: #0d1117;
+    --doc-fg: #e6edf3;
+    --doc-muted: #8d96a0;
+    --doc-border: #30363d;
+    --doc-accent: #4493f8;
+    --doc-code-bg: #161b22;
+    --doc-code-fg: #e6edf3;
+  }
+}
