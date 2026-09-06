@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jst.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>jst.ts</h1>
+    <div class="doc-path">src/lib/date/jst.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      「今日」という 1 つの値を、<strong>日本時間（Asia/Tokyo）基準で</strong>正しく求めるための
+      1 関数だけのファイルです。このアプリのほぼすべての日付計算（車検の残り日数など）は、
+      最初にこの関数で「今日」を得るところから始まります。
+    </p>
+    <p>
+      存在理由はただ一つ、<strong>Cloudflare Workers の実行環境が常に UTC であること</strong>への対処です。
+      サーバーが素朴に「今日」を求めると UTC の日付になりますが、利用者は日本にいるため、
+      UTC と JST の 9 時間のズレが原因で、朝 9 時になるまでサーバーの「今日」が
+      利用者にとっての前日のままになってしまいます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>JST_FORMATTER</code></td><td>const（内部）</td><td>Asia/Tokyo 固定の <code>Intl.DateTimeFormat</code></td></tr>
+        <tr><td><code>todayInJst</code></td><td>function（export）</td><td>日本時間での「今日」を <code>DateString</code> で返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const JST_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})</code></pre>
+      <p>
+        <code>Intl.DateTimeFormat</code> に <code>timeZone: 'Asia/Tokyo'</code> を明示すると、
+        実行環境自体のタイムゾーンが何であっても（Workers の UTC でも、開発者の PC の JST でも）、
+        常に日本時間としての年月日を計算してくれます。これがこのファイル全体の仕組みです。
+      </p>
+      <p>
+        ロケールに <code>'en-CA'</code>（カナダ英語）を指定しているのは翻訳のためではなく、
+        <strong>このロケールの標準的な日付表記がちょうど <code>YYYY-MM-DD</code> になる</strong>という
+        実装上の都合です。日本語ロケール（<code>'ja-JP'</code>）だと
+        <code>2026/09/06</code> のような別形式になってしまい、そのままでは
+        <code>DateString</code> の形式（date-string.ts 参照）と一致しません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function todayInJst(now: Date = new Date()): DateString {
+  return toDateString(JST_FORMATTER.format(now))
+}</code></pre>
+      <p>
+        引数 <code>now</code> を省略すると現在時刻を使いますが、
+        <strong>明示的に渡すこともできる</strong>のがこの関数の重要な設計です。
+        これにより、テストコードは「もし今が 2026年9月6日 の朝9時ちょうどだったら」
+        という特定の瞬間を作って渡せるので、実行するたびに結果が変わってしまう
+        「現在時刻に依存したテスト」を避けられます。
+      </p>
+      <p>
+        戻り値は <code>toDateString</code> を通して <code>DateString</code> 型にしています。
+        <code>Intl.DateTimeFormat</code> の出力は理論上つねに正しい形式になりますが、
+        「型としてただの文字列ではなく検証済みの <code>DateString</code> である」という保証を
+        呼び出し側に伝えるためにこのひと手間を入れています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/jst.ts
+  </footer>
+
+</div>
+</body>
+</html>

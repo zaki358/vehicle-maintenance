@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>days-remaining.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>days-remaining.ts</h1>
+    <div class="doc-path">src/features/shaken/lib/days-remaining.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車検満了日までの残り日数を1つだけ計算する、ごく小さなファイルです。
+      車検の設定が無い車両（250cc以下のバイクなど）を <code>null</code> として
+      正しく扱えることが、このファイルの存在意義です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>daysUntilExpiry</code></td><td>function（export）</td><td>満了日までの残り日数、または車検無しなら <code>null</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function daysUntilExpiry(expiry: DateString | null, today: DateString): number | null {
+  if (expiry === null) {
+    return null
+  }
+  return daysBetween(today, expiry)
+}</code></pre>
+      <p>
+        <code>lib/date/date-string.ts</code> の <code>daysBetween</code> をそのまま呼んでいるだけの
+        薄いラッパーですが、この薄さこそが意図です。<code>expiry</code> が <code>null</code>
+        （250cc以下のバイクなど、そもそも車検の概念が無い車両）の場合を
+        呼び出し元に強制的に意識させるため、専用の関数として切り出しています。
+      </p>
+      <p>
+        戻り値を <code>0</code> や <code>-1</code> のような「意味のある数値」ではなく
+        <code>null</code> にしているのがポイントです。これにより、
+        呼び出し側（<code>alert-tier.ts</code>）は「残り0日（本日満了）」と
+        「そもそも車検が無い」を型のレベルで取り違えなくなります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/shaken/lib/days-remaining.ts
+  </footer>
+
+</div>
+</body>
+</html>

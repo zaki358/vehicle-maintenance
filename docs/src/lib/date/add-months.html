@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>add-months.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>add-months.ts</h1>
+    <div class="doc-path">src/lib/date/add-months.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      日付に「〇ヶ月後」「〇年後」を加算するための関数を提供します。
+      車検の更新は「満了日の2年後」「3年後」を計算する処理そのものなので、
+      このファイルは車検ドメインの計算（features/shaken/lib/renewal.ts）を支える土台になります。
+    </p>
+    <p>
+      中心的な課題は<strong>「月末のクランプ」</strong>です。たとえば 1月31日 の1ヶ月後を素朴に考えると
+      2月31日ですが、2月にそんな日は存在しません。このファイルはそうした場合に、
+      自動的にその月の末日（2月なら28日、うるう年なら29日）に丸めます。
+    </p>
+    <p>
+      JavaScript の <code>Date.setMonth()</code> はこの丸めをしてくれず、
+      1月31日 の1ヶ月後を「3月3日」のように月を繰り越して返してしまいます。
+      そのためこのファイルでは <code>Date</code> を使わず、年・月・日を数値として
+      直接計算しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>addMonths</code></td><td>function（export）</td><td>指定した月数を加算（月末クランプあり）</td></tr>
+        <tr><td><code>addYears</code></td><td>function（export）</td><td>指定した年数を加算（<code>addMonths</code> の薄いラッパー）</td></tr>
+        <tr><td><code>isLeapYear</code></td><td>function（内部）</td><td>うるう年判定</td></tr>
+        <tr><td><code>daysInMonth</code></td><td>function（内部）</td><td>指定した年月の日数</td></tr>
+        <tr><td><code>pad2</code></td><td>function（内部）</td><td>1桁の数値を2桁のゼロ埋め文字列にする</td></tr>
+        <tr><td><code>format</code></td><td>function（内部）</td><td>年・月・日から <code>DateString</code> を組み立てる</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 &amp;&amp; year % 100 !== 0) || year % 400 === 0
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    return isLeapYear(year) ? 29 : 28
+  }
+  return DAYS_IN_MONTH[month - 1]
+}</code></pre>
+      <p>
+        月ごとの日数を求める内部関数です。2月だけはうるう年かどうかで日数が変わるため、
+        特別扱いしています。<code>date-string.ts</code> にも同じ内容の実装がありますが、
+        意図的に重複させています。それぞれのファイルが外部のモジュールに依存せず
+        単独でテストできる状態を保つためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>function pad2(n: number): string {
+  return n &lt; 10 ? `0${n}` : `${n}`
+}
+
+function format(year: number, month: number, day: number): DateString {
+  return `${year}-${pad2(month)}-${pad2(day)}` as DateString
+}</code></pre>
+      <p>
+        年・月・日の数値から <code>"2026-09-06"</code> のような文字列を組み立てます。
+        月と日を2桁ゼロ埋めするための小さなヘルパーです。
+      </p>
+      <p>
+        <code>as DateString</code> で型を強制しているのは、この関数の中でだけ許される操作です。
+        計算した年月日が既に妥当な範囲（<code>daysInMonth</code> でクランプ済み）であることが
+        呼び出し元で保証されているため、ここでは再検証をせずに直接キャストしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function addMonths(date: DateString, monthsToAdd: number): DateString {
+  const year = Number(date.slice(0, 4))
+  const month = Number(date.slice(5, 7))
+  const day = Number(date.slice(8, 10))
+
+  const totalMonths = year * 12 + (month - 1) + monthsToAdd
+  const newYear = Math.floor(totalMonths / 12)
+  const newMonth = (totalMonths % 12) + 1
+
+  const clampedDay = Math.min(day, daysInMonth(newYear, newMonth))
+
+  return format(newYear, newMonth, clampedDay)
+}</code></pre>
+      <p>
+        このファイルの中核です。手順は次の3段階です。
+      </p>
+      <p>
+        <strong>1. 月を「通し番号」に変換する。</strong>
+        「2026年1月」を <code>2026 × 12 + 0 = 24312</code> のような 1 つの整数として扱うと、
+        年をまたぐ繰り上がり・繰り下がりを気にせず、単純な足し算・引き算だけで
+        月の加減算ができます。
+      </p>
+      <p>
+        <strong>2. 通し番号を年と月に戻す。</strong>
+        <code>Math.floor(totalMonths / 12)</code> で年、
+        <code>(totalMonths % 12) + 1</code> で月（1〜12）を復元します。
+        負の数を渡しても（過去に戻る場合）<code>Math.floor</code> と正の剰余が
+        正しく機能するように意図的に選んでいます。
+      </p>
+      <p>
+        <strong>3. 日をクランプする。</strong>
+        <code>Math.min(day, daysInMonth(newYear, newMonth))</code> が肝心の処理です。
+        「元の日」と「加算先の月の最大日数」の小さいほうを採用することで、
+        1月31日の1ヶ月後が2月31日という存在しない日付にならず、
+        自動的に2月28日（またはうるう年なら29日）に収まります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function addYears(date: DateString, yearsToAdd: number): DateString {
+  return addMonths(date, yearsToAdd * 12)
+}</code></pre>
+      <p>
+        年の加算は「12ヶ月をその年数分」加算するのと同じなので、
+        <code>addMonths</code> をそのまま利用しています。
+      </p>
+      <p>
+        あえて別関数として公開しているのは、車検更新のコードを読むときに
+        <code>addYears(expiry, 2)</code> と書けたほうが「2年後」という意図が
+        一目で伝わるためです。<code>addMonths(expiry, 24)</code> でも同じ結果になりますが、
+        読み手が暗算する必要がなくなります。
+      </p>
+      <p>
+        月末クランプの挙動もそのまま引き継がれます。たとえば
+        <code>2024-02-29</code>（うるう年の2月29日）の1年後は、2025年がうるう年ではないため
+        <code>2025-02-28</code> にクランプされます。これは車検の実務にも合致する挙動です
+        （うるう日に受検した車両の次回満了日は、平年であれば2月28日になる）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/add-months.ts
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>alert-tier.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>alert-tier.ts</h1>
+    <div class="doc-path">src/features/shaken/lib/alert-tier.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      このアプリの<strong>要件の中核</strong>である「車検満了日の2ヶ月前・1ヶ月前になったら知らせる」
+      をそのまま実装したファイルです。満了日と今日の2つの日付から、
+      画面に出すべき警告の強さ（4段階）を1つ判定します。
+    </p>
+    <p>
+      要件は「2ヶ月前」「1ヶ月前」という<strong>カレンダー上の月</strong>を指しており、
+      「60日前」「30日前」のような日数の近似ではありません。31日ある月をまたぐ満了日では
+      日数近似だと1日ずれてしまうため、このファイルは月の加算（<code>addMonths</code>）を使って
+      「暦月」で正確に判定します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ShakenAlertTier</code></td><td>type（export）</td><td>4段階の警告レベル: none/warning/danger/expired</td></tr>
+        <tr><td><code>shakenAlertTier</code></td><td>function（export）</td><td>満了日と今日から警告レベルを判定する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type ShakenAlertTier = 'none' | 'warning' | 'danger' | 'expired'</code></pre>
+      <p>
+        4つの状態を文字列リテラル型で表します。<code>none</code>（不要）、
+        <code>warning</code>（残り2ヶ月以内・注意）、<code>danger</code>（残り1ヶ月以内・警告）、
+        <code>expired</code>（期限切れ）の4段階です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function shakenAlertTier(expiry: DateString | null, today: DateString): ShakenAlertTier {
+  if (expiry === null) {
+    return 'none'
+  }
+
+  if (today &gt; expiry) {
+    return 'expired'
+  }
+
+  if (isOnOrAfter(today, addMonths(expiry, -1))) {
+    return 'danger'
+  }
+
+  if (isOnOrAfter(today, addMonths(expiry, -2))) {
+    return 'warning'
+  }
+
+  return 'none'
+}</code></pre>
+      <p>
+        判定は上から順に、範囲の広いものから狭いものへと絞り込んでいきます。
+      </p>
+      <p>
+        <strong>1. <code>expiry === null</code></strong> — 250cc以下のバイクなど、
+        そもそも車検が無い車両。常に <code>none</code>。
+      </p>
+      <p>
+        <strong>2. <code>today &gt; expiry</code></strong> — 満了日を過ぎている。
+        ここで <code>&gt;</code>（同日を含まない）を使っているのが重要です。
+        満了日<strong>当日</strong>は「まだ期限切れではない」と扱いたいため、
+        <code>today &gt; expiry</code> は満了日当日には成立せず、
+        次の <code>danger</code> 判定に進みます。
+      </p>
+      <p>
+        <strong>3. <code>isOnOrAfter(today, addMonths(expiry, -1))</code></strong> —
+        「今日が『満了日の1ヶ月前』以降か」。<code>addMonths(expiry, -1)</code> で
+        満了日ちょうど1ヶ月前の日付を求め、今日がそこに達していれば
+        <code>danger</code> です。<code>isOnOrAfter</code> は同日を含むので、
+        1ヶ月前ちょうどの日も <code>danger</code> に入ります。
+      </p>
+      <p>
+        <strong>4. <code>isOnOrAfter(today, addMonths(expiry, -2))</code></strong> —
+        同じ考え方で2ヶ月前かどうかを判定します。3番目の判定を通過しなかった
+        （＝1ヶ月前にはまだ達していない）ことが分かっている状態でこの判定に来るので、
+        ここが真なら「2ヶ月前は過ぎたが1ヶ月前はまだ」＝ <code>warning</code> と確定します。
+      </p>
+      <p>
+        <strong>5. どれにも該当しなければ</strong> <code>none</code>。まだ2ヶ月前にも
+        達していない、十分先の満了日です。
+      </p>
+      <p>
+        月末が満了日のケース（例: 1月31日）では、2ヶ月前を計算すると
+        11月に31日が存在しないため <code>addMonths</code> が自動的に11月30日に
+        丸めます（詳細は <code>add-months.ts</code> 参照）。この関数はその丸め済みの
+        日付をそのまま使うので、月末満了日でも特別な分岐なく正しく動作します。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/shaken/lib/alert-tier.ts
+  </footer>
+
+</div>
+</body>
+</html>

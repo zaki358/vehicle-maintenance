@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>messages.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>messages.ts</h1>
+    <div class="doc-path">src/features/shaken/lib/messages.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      <code>alert-tier.ts</code> が判定した4段階の警告レベルを、
+      画面に表示する具体的な日本語の文章に変換するファイルです。
+      「レベルの判定」と「文言」を別ファイルに分けることで、
+      文言だけを直したいとき（言い回しの調整など）に判定ロジックを
+      触らずに済みます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>shakenTierMessage</code></td><td>function（export）</td><td>警告レベルと残り日数から表示文言を組み立てる</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function shakenTierMessage(tier: ShakenAlertTier, daysRemaining: number | null): string {
+  switch (tier) {
+    case 'none':
+      return ''
+
+    case 'warning':
+      return `車検まであと${daysRemaining}日です。そろそろ予約をご検討ください。`
+
+    case 'danger':
+      if (daysRemaining === 0) {
+        return '本日が車検満了日です。至急受検してください。'
+      }
+      return `車検まであと${daysRemaining}日です。お早めに受検してください。`
+
+    case 'expired': {
+      const overdueDays = Math.abs(daysRemaining ?? 0)
+      return `車検が${overdueDays}日超過しています。至急受検してください。`
+    }
+  }
+}</code></pre>
+      <p>
+        <code>tier</code>（4値のリテラル型）で分岐する <code>switch</code> です。
+        すべての値を網羅しているため、TypeScript は分岐漏れがあれば
+        コンパイルエラーとして検出できます（将来 <code>ShakenAlertTier</code> に
+        新しい状態が増えたときの安全網になります）。
+      </p>
+      <p>
+        <strong><code>danger</code> の中の特別扱い。</strong>
+        残り日数が <code>0</code>（本日が満了日）のときだけ、
+        「あと0日です」ではなく「本日が満了日です」という、
+        人間が読んで自然な文言に切り替えています。数値をそのまま
+        文章に埋め込むだけでは不自然になる箇所を手当てしています。
+      </p>
+      <p>
+        <strong><code>expired</code> の符号反転。</strong>
+        <code>daysUntilExpiry</code>（<code>days-remaining.ts</code>）は
+        期限切れの場合に負の数（例: <code>-5</code>）を返す設計でした。
+        利用者向けの文言では「5日超過」のように正の数で見せたいため、
+        ここで <code>Math.abs</code> を使って符号を反転しています。
+      </p>
+      <p>
+        <code>daysRemaining ?? 0</code> は型の上で <code>null</code> を許容している
+        ことへの防御です。実際の呼び出し経路では <code>expired</code> のときに
+        <code>daysRemaining</code> が <code>null</code> になることはありませんが
+        （満了日が存在するからこそ期限切れと判定されるため）、型が許している
+        以上は関数単体で見たときに安全であるべき、という考え方で入れています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/shaken/lib/messages.ts
+  </footer>
+
+</div>
+</body>
+</html>

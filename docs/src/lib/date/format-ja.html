@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>format-ja.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>format-ja.ts</h1>
+    <div class="doc-path">src/lib/date/format-ja.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      日付を日本語の画面表示用の文字列に変換する専用ファイルです。
+      「2026年9月6日(日)」のような曜日付きの表示と、「9/6」のような一覧向けの短い表示の
+      2 種類を提供します。
+    </p>
+    <p>
+      <code>lib/date</code> ディレクトリの中で<strong>唯一 <code>date-fns</code> を使ってよいファイル</strong>です。
+      他のファイル（<code>date-string.ts</code>、<code>add-months.ts</code>）は
+      Cloudflare Workers（UTC）と利用者の端末（JST）のタイムゾーン差を避けるため、
+      意図的に <code>Date</code> オブジェクトを使わず文字列と整数だけで計算しています。
+      このファイルがやっているのは日付の「計算」ではなく「表示への変換」であり、
+      曜日名を求めるには標準ライブラリの厚みが要るため、ここだけ例外的に <code>date-fns</code> を使います。
+    </p>
+    <p>
+      <strong>このファイルの関数を計算に使ってはいけません。</strong>
+      日付の前後比較や加減算は、必ず <code>date-string.ts</code> や <code>add-months.ts</code> の関数を使います。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>formatJa</code></td><td>function（export）</td><td>「2026年9月6日(日)」形式。満了日など、しっかり読ませたい場面用</td></tr>
+        <tr><td><code>formatJaShort</code></td><td>function（export）</td><td>「9/6」形式。記録一覧など、日付を何行も並べる場面用</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function formatJa(date: DateString): string {
+  return format(parseISO(date), 'yyyy年M月d日(E)', { locale: ja })
+}</code></pre>
+      <p>
+        <code>parseISO</code> で <code>DateString</code>（<code>"2026-09-06"</code> の形式）を
+        <code>Date</code> オブジェクトに変換し、<code>date-fns</code> の <code>format</code> で
+        日本語の書式に整形します。書式指定子 <code>'yyyy年M月d日(E)'</code> の
+        <code>M</code>・<code>d</code>（大文字小文字を区別）はゼロ埋めしない月・日を意味し、
+        <code>(E)</code> が曜日（日本語ロケールなら「日」「月」など1文字）に対応します。
+      </p>
+      <p>
+        <strong>なぜ「計算」ではなく「変換」だから安全なのか。</strong>
+        <code>YYYY-MM-DD</code> のような日付のみの文字列を <code>parseISO</code>（内部的には
+        <code>Date</code> のコンストラクタと同様の解釈）に渡すと、
+        <strong>UTC の深夜0時</strong>として解釈されます。ここから
+        <code>format</code> が年・月・日・曜日を取り出す際も一貫して UTC 基準の値を読むため、
+        実行環境（Workers の UTC でも開発機の JST でも）に関わらず、
+        入力した日付文字列どおりの年月日・曜日が得られます。
+        タイムゾーンのズレが問題になるのは「今この瞬間が何月何日か」を求める場面
+        （<code>jst.ts</code> の役割）であって、「すでに確定した日付文字列を人間向けに書き直す」
+        だけのこの関数には影響しません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function formatJaShort(date: DateString): string {
+  return format(parseISO(date), 'M/d')
+}</code></pre>
+      <p>
+        整備記録の一覧のように、日付を何行も縦に並べる画面では
+        曜日や年まで出すと画面が窮屈になります。<code>formatJa</code> より短い
+        「9/6」形式だけを返す、一覧表示専用の関数です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/format-ja.ts
+  </footer>
+
+</div>
+</body>
+</html>

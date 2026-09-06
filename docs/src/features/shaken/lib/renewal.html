@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>renewal.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>renewal.ts</h1>
+    <div class="doc-path">src/features/shaken/lib/renewal.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車検を受けたときに、次の満了日をいくつに設定すべきかを計算するファイルです。
+      「＋2年」「＋3年（新車初回）」を選ぶだけでなく、
+      <strong>日本の車検制度に実在する「繰り越しルール」</strong>まで正確に再現しています。
+    </p>
+    <p>
+      制度の要点: 満了日の1ヶ月前以内に受検すれば、新しい満了日は
+      「受検日 ＋ N年」ではなく<strong>「旧満了日 ＋ N年」</strong>になります。
+      これは早めに受検した人が損をしない（満了日が前倒しにならない）ための仕組みです。
+      逆に1ヶ月より前に受検すると、この繰り越しは適用されず受検日を起点に数え直されます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ShakenValidYears</code></td><td>type（export）</td><td>有効期間。2年 または 3年（新車初回）のみを許す</td></tr>
+        <tr><td><code>RenewalInput</code></td><td>type（export）</td><td>計算に必要な入力（受検日・旧満了日・有効期間）</td></tr>
+        <tr><td><code>computeNextShakenExpiry</code></td><td>function（export）</td><td>新しい満了日を計算する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type ShakenValidYears = 2 | 3</code></pre>
+      <p>
+        車検の有効期間は「2年」か「3年（新車初回）」の2択しかありません。
+        <code>number</code> ではなくこのリテラル型にすることで、
+        誤って「5年」のような値を渡すコードを型検査の段階で弾けます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function computeNextShakenExpiry({ completedOn, currentExpiry, years }: RenewalInput): DateString {
+  if (currentExpiry === null) {
+    return addYears(completedOn, years)
+  }
+
+  const oneMonthBeforeExpiry = addMonths(currentExpiry, -1)
+  const isWithinCarryForwardWindow =
+    isOnOrAfter(completedOn, oneMonthBeforeExpiry) &amp;&amp; isOnOrAfter(currentExpiry, completedOn)
+
+  if (isWithinCarryForwardWindow) {
+    return addYears(currentExpiry, years)
+  }
+
+  return addYears(completedOn, years)
+}</code></pre>
+      <p>
+        <strong>1. 新規登録（<code>currentExpiry === null</code>）。</strong>
+        車両を初めて登録して車検情報を設定する場面では、繰り越す元の満了日が
+        存在しません。単純に受検日から <code>years</code> 年後です。
+      </p>
+      <p>
+        <strong>2. 繰り越しの判定窓（<code>isWithinCarryForwardWindow</code>）。</strong>
+        「受検日が『旧満了日の1ヶ月前』以降、かつ『旧満了日』以前」という
+        条件を、日付の両側から挟み込む形で表しています。
+      </p>
+      <ul>
+        <li><code>isOnOrAfter(completedOn, oneMonthBeforeExpiry)</code> —
+          早すぎる受検（1ヶ月より前）を除外する側</li>
+        <li><code>isOnOrAfter(currentExpiry, completedOn)</code> —
+          期限切れ後の受検を除外する側（＝受検日が旧満了日を超えていないこと）</li>
+      </ul>
+      <p>
+        両方を満たす窓の中でだけ、繰り越し（<code>addYears(currentExpiry, years)</code>）が
+        適用されます。窓の外（早すぎるか、遅すぎるか）では、素直に
+        <code>addYears(completedOn, years)</code> で受検日を起点に数え直します。
+      </p>
+      <p>
+        この「窓」という考え方にしたことで、早すぎるケースと期限切れケースを
+        別々の条件分岐で書く必要がなくなり、テストケースも「窓の内側」
+        「窓の外側（前後2方向）」というシンプルな3分類に対応させられます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/shaken/lib/renewal.ts
+  </footer>
+
+</div>
+</body>
+</html>

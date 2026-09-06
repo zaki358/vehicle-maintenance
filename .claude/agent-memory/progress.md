@@ -3,15 +3,16 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06（Phase 1 ほぼ完了・最初のソースファイル完成）
+最終更新: 2026-09-06（Phase 3 前半完了・shaken/lib 全ファイル完成）
 
 ---
 
 ## 現在地
 
-**Phase 1 — 骨組み** がほぼ完了。テスト基盤が動き、最初のソースファイル
-`src/lib/date/date-string.ts` が TDD で完成（34 テスト・カバレッジ 100%）。
-残るは専用サブエージェントの作成のみ。
+**Phase 1 完了。Phase 3（純粋ロジック）前半が完了。**
+`src/lib/date/*`（4ファイル）と `src/features/shaken/lib/*`（4ファイル）が
+すべて TDD で完成し、**101 テスト・カバレッジ全指標 100%**。
+専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
 
@@ -46,26 +47,56 @@
       import 禁止（日本語のエラーメッセージ付き）
 - [x] **`src/lib/date/date-string.ts` 完成**（TDD: RED → GREEN 確認済み）
       `DateString` ブランド型 / `isDateString` / `toDateString` / `toUtcMillis` / `daysBetween` /
-      `isOnOrAfter` / `isOnOrBefore`。**34 テスト・カバレッジ 100%（stmt/branch/func/line すべて）**
+      `isOnOrAfter` / `isOnOrBefore`。34 テスト・カバレッジ 100%
 - [x] **解説ドキュメント生成** — `docs/src/lib/date/date-string.html`（共有CSS `docs/assets/doc-style.css` も初回作成）
+- [x] **Git 初回コミット完了**（コミット `6fd85c4`）。機密情報の混入なしを確認済み
+- [x] **`src/lib/date/jst.ts` 完成** — `todayInJst()`。`Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Tokyo'})`
+      で実行環境のタイムゾーンに依存せず JST の「今日」を取得。`docs/.../jst.html` 生成済み
+- [x] **`src/lib/date/add-months.ts` 完成** — `addMonths` / `addYears`。月末クランプ（1/31+1ヶ月→2/28等）に
+      対応。20 テスト。`docs/.../add-months.html` 生成済み
+- [x] **`src/lib/date/format-ja.ts` 完成** — `formatJa` / `formatJaShort`。**lib/date で唯一 date-fns を使う
+      ファイル**（表示整形専用、計算には使わない）。6 テスト。`docs/.../format-ja.html` 生成済み
+- [x] **`src/features/shaken/lib/days-remaining.ts` 完成** — `daysUntilExpiry`。満了日 null（250cc以下等）を
+      正しく扱う。4 テスト
+- [x] **`src/features/shaken/lib/alert-tier.ts` 完成** — `shakenAlertTier`（アプリの中核要件）。
+      none/warning/danger/expired の4段階を暦月で判定。12 テスト
+- [x] **`src/features/shaken/lib/renewal.ts` 完成** — `computeNextShakenExpiry`。**制度どおりの繰り越し
+      ルール**（満了日1ヶ月前以内の受検は「旧満了日+N年」）を実装。10 テスト
+- [x] **`src/features/shaken/lib/messages.ts` 完成** — `shakenTierMessage`。段階別の日本語メッセージ。6 テスト
+- [x] **shaken/lib 4ファイルの解説ドキュメント生成完了** — `docs/src/features/shaken/lib/*.html`
+
+## 判断の記録
+
+- **プロジェクト専用サブエージェント（`.claude/agents/` への上書き）は作らない方針に変更。**
+  依頼者からグローバルの `code-reviewer`/`e2e-runner`/`security-reviewer`/`database-reviewer` が
+  そのまま使えるはずとの指摘があり、確認したところ正しかった（`~/.claude/agents/*.md` に実在）。
+  レビュー依頼時にプロンプトでこのプロジェクト固有の観点（JST問題・RLS・車検ドメイン等）を
+  都度渡す方針にする。無理に専用ファイルを作る必要はない
+- **検証系コマンド（lint/typecheck/test/build/dev）は事前承認済み**で毎回止まらない。
+  インストール・デプロイ・本番DB適用・大容量DL・削除は都度承認
 
 ---
 
 ## 次にやること
 
-1. **プロジェクト専用サブエージェントを `.claude/agents/` に作る**（Phase 1 の最後の項目）
-   このプロジェクト固有の観点を組み込む: 日本語UI / モバイルファースト / 車検ドメイン /
-   JST・UTC 問題 / サーバー用 Supabase クライアントのメモ化禁止 / RLS の WITH CHECK
-2. **Phase 3 の純粋ロジックを続ける**（Supabase 待ちの間に進められる）
-   次の順序: `lib/date/jst.ts`（todayInJst）→ `lib/date/add-months.ts` →
-   `features/shaken/lib/{days-remaining,alert-tier,renewal,messages}.ts`
-   ※ 各ファイル完成ごとに `generate-code-docs` を呼ぶこと
-3. **Phase 2（DB とマイグレーション）** — **依頼者の Supabase プロジェクト作成待ち**
+Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
 
-## 未コミット
+1. **`features/vehicles/lib/*`** — `vehicle-schema.ts`（Zod 4系の記法に注意）、
+   `vehicle-type.ts`（car/motorcycle の日本語ラベル）、`shaken-required.ts`
+2. **`features/maintenance/lib/*`** — `work-types.ts`（プリセット定義：エンジンオイル/
+   オイルエレメント/タイヤ/ブレーキパッド/バッテリー/車検/その他）、`record-schema.ts`
+   （「その他」選択時は自由入力必須というルールを Zod で表現）、`filter-records.ts`、
+   `sort-records.ts`、`part-suggestions.ts`、`odometer.ts`
+3. **`features/dashboard/lib/*`** — `since-last-service.ts`、`build-summary.ts`
+4. **`features/auth/lib/*`** — `login-schema.ts`（Zod）、`auth-errors.ts`
 
-Git にはまだ 1 度もコミットしていない（`master` ブランチ、コミット履歴ゼロ）。
-依頼者に確認してから初回コミットを行うこと。
+そのあと **Phase 2（DB とマイグレーション）** — **依頼者の Supabase プロジェクト作成待ち**。
+Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）にすぐ入れる。
+
+## 次のセッションで最初にやること
+
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 101 テストが
+全て通り、カバレッジが崩れていないことを確認してから続きに着手すること。
 
 ---
 
