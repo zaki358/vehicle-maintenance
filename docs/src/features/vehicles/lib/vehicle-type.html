@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vehicle-type.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>vehicle-type.ts</h1>
+    <div class="doc-path">src/features/vehicles/lib/vehicle-type.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の「区分」（車かバイクか）を表す型と、それを画面に表示するための
+      日本語ラベルへの変換関数をまとめた、ごく小さなファイルです。
+    </p>
+    <p>
+      車両区分はこのアプリの複数箇所（登録フォーム、一覧表示、車検対象かどうかの
+      判定など）で使われるため、文字列リテラルを直接あちこちに書くのではなく、
+      ここで型として一度だけ定義しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>VehicleType</code></td><td>type（export）</td><td>車両区分: <code>'car'</code> または <code>'motorcycle'</code></td></tr>
+        <tr><td><code>vehicleTypeLabel</code></td><td>function（export）</td><td>車両区分から日本語ラベル（「車」「バイク」）を返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type VehicleType = 'car' | 'motorcycle'</code></pre>
+      <p>
+        車と単車の2択を文字列リテラル型で表現しています。<code>enum</code> ではなく
+        リテラルユニオンを使うのは、このプロジェクト全体の方針（<code>coding-style</code>）
+        に合わせたものです。値が2つだけで今後も増える見込みが薄いため、
+        シンプルな文字列のままで十分です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function vehicleTypeLabel(type: VehicleType): string {
+  switch (type) {
+    case 'car':
+      return '車'
+    case 'motorcycle':
+      return 'バイク'
+  }
+}</code></pre>
+      <p>
+        画面表示用に日本語へ変換するだけの関数です。<code>switch</code> で
+        <code>VehicleType</code> の全パターンを網羅しているため、将来
+        <code>VehicleType</code> に新しい値を追加した際は TypeScript が
+        「網羅していない」というエラーで教えてくれます（各 <code>case</code> が値を
+        返しているため、関数全体の戻り値の型チェックが漏れを検出します）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/vehicles/lib/vehicle-type.ts
+  </footer>
+
+</div>
+</body>
+</html>

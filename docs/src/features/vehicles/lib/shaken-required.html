@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shaken-required.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>shaken-required.ts</h1>
+    <div class="doc-path">src/features/vehicles/lib/shaken-required.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ある車両に「車検UI」（満了日の表示、<code>shaken/lib</code> によるアラート、
+      更新フォームなど）を出すべきかどうかを1つの関数で判定します。
+    </p>
+    <p>
+      250cc以下のバイクなど車検制度そのものが存在しない車両があり、
+      そうした車両は登録時に満了日を設定しません（<code>shakenExpiryDate</code> が
+      <code>null</code>）。この関数はその <code>null</code> の有無だけを見て判定します。
+      車両区分（<code>vehicleType</code>）では判定しないのがポイントで、これは
+      車のほうに満了日を設定するかどうかも含めて、最終的にはユーザーの入力が
+      正なので、区分から自動で決め打ちしないようにするためです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>shakenRequired</code></td><td>function（export）</td><td>満了日の有無から車検UI表示の要否を判定する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function shakenRequired(shakenExpiryDate: DateString | null): boolean {
+  return shakenExpiryDate !== null
+}</code></pre>
+      <p>
+        引数はただ1つ、満了日（<code>DateString</code>）または <code>null</code>。
+        <code>null</code> でなければ車検UIの対象、<code>null</code> なら対象外、
+        というだけの単純な判定です。
+      </p>
+      <p>
+        処理としては1行ですが、あえて独立した関数として切り出しているのには理由が
+        あります。「満了日が <code>null</code> かどうか」というチェックを呼び出し側
+        （コンポーネントやダッシュボードのロジック）にそのまま書かせると、
+        コードを読んだときに「なぜ <code>null</code> チェックしているのか」が
+        伝わりません。<code>shakenRequired(...)</code> という名前の関数にすることで、
+        「これは250cc以下のバイクなど車検制度対象外の判定である」という意図が
+        呼び出し側のコードだけで読み取れるようになります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/vehicles/lib/shaken-required.ts
+  </footer>
+
+</div>
+</body>
+</html>

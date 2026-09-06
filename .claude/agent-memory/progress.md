@@ -3,15 +3,16 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06（作業を一時中断。次回はここから再開）
+最終更新: 2026-09-06（`features/vehicles/lib` 完成）
 
 ---
 
 ## 現在地
 
-**Phase 1 完了。Phase 3（純粋ロジック）前半が完了。**
-`src/lib/date/*`（4ファイル）と `src/features/shaken/lib/*`（4ファイル）が
-すべて TDD で完成し、**101 テスト・カバレッジ全指標 100%**。
+**Phase 1 完了。Phase 3（純粋ロジック）中盤まで完了。**
+`src/lib/date/*`（4ファイル）、`src/features/shaken/lib/*`（4ファイル）、
+`src/features/vehicles/lib/*`（3ファイル）がすべて TDD で完成し、
+**118 テスト・カバレッジ全指標 100%**。
 専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
@@ -64,6 +65,15 @@
       ルール**（満了日1ヶ月前以内の受検は「旧満了日+N年」）を実装。10 テスト
 - [x] **`src/features/shaken/lib/messages.ts` 完成** — `shakenTierMessage`。段階別の日本語メッセージ。6 テスト
 - [x] **shaken/lib 4ファイルの解説ドキュメント生成完了** — `docs/src/features/shaken/lib/*.html`
+- [x] **`src/features/vehicles/lib/vehicle-type.ts` 完成** — `VehicleType`（car/motorcycle）と
+      日本語ラベル変換 `vehicleTypeLabel`。2テスト
+- [x] **`src/features/vehicles/lib/shaken-required.ts` 完成** — `shakenRequired`。満了日
+      （`shakenExpiryDate`）の有無だけで車検UI表示の要否を判定（車両区分では分岐しない）。2テスト
+- [x] **`src/features/vehicles/lib/vehicle-schema.ts` 完成** — `vehicleSchema`（Zod）。
+      name(trim+必須+50字)/vehicleType(enum)/shakenExpiryDate(null許容、`isDateString`共有検証)/
+      note(trim+1000字+空文字デフォルト)。Zod 4の`.transform()`+`ctx.addIssue`+`z.NEVER`パターンと
+      `z.enum(..., {error})`の記法をnode -eで実挙動確認してから実装。13テスト
+- [x] **vehicles/lib 3ファイルの解説ドキュメント生成完了** — `docs/src/features/vehicles/lib/*.html`
 
 ## 判断の記録
 
@@ -94,8 +104,7 @@
 
 Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
 
-1. **`features/vehicles/lib/*`** — `vehicle-schema.ts`（Zod 4系の記法に注意）、
-   `vehicle-type.ts`（car/motorcycle の日本語ラベル）、`shaken-required.ts`
+1. ~~**`features/vehicles/lib/*`**~~ — **完成済み**（`vehicle-schema.ts` / `vehicle-type.ts` / `shaken-required.ts`）
 2. **`features/maintenance/lib/*`** — `work-types.ts`（プリセット定義：エンジンオイル/
    オイルエレメント/タイヤ/ブレーキパッド/バッテリー/車検/その他）、`record-schema.ts`
    （「その他」選択時は自由入力必須というルールを Zod で表現）、`filter-records.ts`、
@@ -108,13 +117,13 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 101 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 118 テストが
 全て通り、カバレッジが崩れていないことを確認してから続きに着手すること
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
+次は「次にやること」の 2番目 `features/maintenance/lib` から着手する。
 
-**中断時点**: `src/lib/date/*` と `src/features/shaken/lib/*` が完成し、
-2回コミット済み（直近コミット: 日付ライブラリと車検ドメインロジック）。
-次は「次にやること」に書いた `features/vehicles/lib` から着手する。
+**中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`
+が完成し、コミット済み。次は `features/maintenance/lib` から着手する。
 
 ---
 
@@ -187,7 +196,7 @@ Phase 3 が終わっていれば、DB ができ次第 Phase 4（認証配線）�
 - [x] Phase 0 — 環境準備
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
 - [ ] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト）
-- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date-string.ts 完成、ここを先に進める**
+- [~] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **date/shaken/vehicles 完成、次は maintenance**
 - [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
 - [ ] Phase 5 — 車両 CRUD
 - [ ] Phase 6 — 整備記録 CRUD

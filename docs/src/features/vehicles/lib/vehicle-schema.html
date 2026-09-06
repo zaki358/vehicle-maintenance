@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vehicle-schema.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>vehicle-schema.ts</h1>
+    <div class="doc-path">src/features/vehicles/lib/vehicle-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の登録・編集フォームから送られてくる入力を検証する Zod スキーマです。
+      「全書き込みはサーバー関数の入口で Zod 検証する」というプロジェクト方針
+      （<code>CLAUDE.md</code>）に沿って、車両まわりの入力検証をこの1ファイルに
+      集約しています。
+    </p>
+    <p>
+      使っている Zod は 4系で、<code>z.string().email()</code> のような書き方が
+      廃止されるなど記法が変わっているため、実際にインストールされているバージョンの
+      挙動をコードで確認しながら実装しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>vehicleSchema</code></td><td>const（export）</td><td>車両フォーム入力を検証する Zod スキーマ</td></tr>
+        <tr><td><code>VehicleInput</code></td><td>type（export）</td><td><code>vehicleSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>dateStringSchema</code></td><td>const（非公開）</td><td>文字列を検証して <code>DateString</code> に絞り込む内部スキーマ</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const dateStringSchema = z.string().transform((value, ctx) => {
+  if (!isDateString(value)) {
+    ctx.addIssue({ code: 'custom', message: '日付は YYYY-MM-DD 形式で、実在する日付を指定してください' })
+    return z.NEVER
+  }
+  return value
+})</code></pre>
+      <p>
+        満了日の検証に使う内部スキーマです。ただの正規表現ではなく、
+        <code>src/lib/date/date-string.ts</code> の <code>isDateString</code> を
+        そのまま呼び出しています。これにより「形式は <code>YYYY-MM-DD</code> だが
+        <code>2026-02-30</code> のように実在しない日付」も、日付ロジック側と
+        まったく同じ基準ではじけます。判定ルールを2箇所に別々に書いて
+        ズレるリスクを避けるための共有です。
+      </p>
+      <p>
+        <code>.refine()</code>ではなく<code>.transform()</code> を使っているのは、
+        検証に通った後の値を <code>DateString</code>（ブランド型）として
+        扱いたいためです。<code>isDateString</code> は TypeScript の型ガード
+        （<code>value is DateString</code>）なので、<code>if</code> 文を通過した後の
+        <code>return value</code> は自動的に <code>DateString</code> 型として
+        推論されます。検証に失敗した場合は <code>ctx.addIssue</code> でエラーを
+        積んだ上で <code>z.NEVER</code> を返し、Zod にこの入力が無効であることを
+        伝えます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const vehicleSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, '車種名を入力してください')
+    .max(NAME_MAX_LENGTH, `車種名は${NAME_MAX_LENGTH}文字以内で入力してください`),
+  vehicleType: z.enum(['car', 'motorcycle'], { error: '車両区分を選択してください' }),
+  shakenExpiryDate: dateStringSchema.nullable(),
+  note: z
+    .string()
+    .trim()
+    .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
+    .default(''),
+})</code></pre>
+      <p>
+        4つのフィールドを検証します。
+      </p>
+      <p>
+        <strong><code>name</code></strong> — <code>.trim()</code> で前後の空白を
+        落としてから <code>.min(1)</code> で必須チェックするため、
+        空白だけの入力（<code>"   "</code>）も未入力として弾かれます。
+        上限は50文字。
+      </p>
+      <p>
+        <strong><code>vehicleType</code></strong> — <code>'car'</code> /
+        <code>'motorcycle'</code> の2値のみ許可する列挙。<code>vehicle-type.ts</code>
+        の <code>VehicleType</code> 型と対応しています。
+      </p>
+      <p>
+        <strong><code>shakenExpiryDate</code></strong> — 上で定義した
+        <code>dateStringSchema</code> を <code>.nullable()</code> でラップしています。
+        <code>null</code> は「250cc以下のバイクなど車検制度の対象外」を表す
+        正常値であり、エラーにはしません（判定は
+        <code>shaken-required.ts</code> の役割）。
+      </p>
+      <p>
+        <strong><code>note</code></strong> — 備考欄。<code>.default('')</code>
+        により、フォームで備考が未入力（<code>undefined</code>）でも常に文字列
+        <code>''</code> として扱われ、以降のコードで <code>null</code> や
+        <code>undefined</code> の分岐を書かずに済みます。上限は1000文字。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export type VehicleInput = z.infer&lt;typeof vehicleSchema&gt;</code></pre>
+      <p>
+        スキーマから型を逆算しています。フィールドの型定義をスキーマとTypeScriptの
+        型定義の2箇所に書くと将来どちらかが更新漏れでズレるため、
+        スキーマを唯一の情報源（single source of truth）にしています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-06 ／ 対象ファイル: src/features/vehicles/lib/vehicle-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>
