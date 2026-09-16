@@ -3,20 +3,20 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-06(auth/lib 完成、Phase 3 完了)（`features/maintenance/lib` 完成）
+最終更新: 2026-09-10(Phase 2 着手。開発用DBにマイグレーション適用済み)
 
 ---
 
 ## 現在地
 
-**Phase 1 完了。Phase 3（純粋ロジック）完了。**
+**Phase 1・Phase 2・Phase 3 完了。次はPhase 4(認証)。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
 すべて TDD で完成し、**205 テスト・カバレッジ全指標 100%**。
-Phase 3（純粋ロジック）はこれで完了。次は Phase 4（認証）以降だが、
-Supabase プロジェクト作成待ちのため着手不可(下記参照)。
-専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
+**マイグレーション4本(vehicles/maintenance_records/RLS/complete_shaken)を開発用・本番用
+両方のSupabaseプロジェクトへ適用済み。RLS統合テストも5件全て成功。`database.types.ts`も
+生成済み。** 専用サブエージェント作成は優先度を下げた（下記「判断の記録」参照）。
 
 ---
 
@@ -111,6 +111,44 @@ Supabase プロジェクト作成待ちのため着手不可(下記参照)。
       日本語メッセージへ変換。`invalid_credentials`と`user_not_found`を同一文言にしてユーザー列挙を防止。
       `@supabase/*`をimportしないよう構造的型`AuthErrorLike`で受け取る設計。13テスト
 - [x] **auth/lib 2ファイルの解説ドキュメント生成完了** — `docs/src/features/auth/lib/*.html`
+- [x] **Supabase プロジェクト作成完了（依頼者側）** — dev/本番の Project URL・Publishable key を受領し
+      `.env`（dev）/ `.env.production.local`（本番）に保存。**Supabase ダッシュボードの表記が
+      「Project URL」→「API URL」に変わり、場所も Project Settings → General から
+      Project Settings → Data API に移動**していたため `docs/setup-supabase.md` の3-1を修正済み
+- [x] **公開サインアップの無効化を dev/本番の両方で確認済み**
+- [x] **マイグレーション4本を作成**
+      — `supabase/migrations/20260907230000_create_set_updated_at_function.sql`
+      （updated_at 自動更新トリガー関数）
+      `supabase/migrations/20260907230100_create_vehicles.sql`
+      （vehicles テーブル。RLS 4ポリシー・`unique(id,user_id)`）
+      `supabase/migrations/20260907230200_create_maintenance_records.sql`
+      （maintenance_records テーブル。`(vehicle_id,user_id)` 複合外部キー・RLS 4ポリシー・
+      `work_type='other'`時の`work_type_other`必須CHECK制約）
+      `supabase/migrations/20260907230300_create_complete_shaken_function.sql`
+      （`complete_shaken` RPC。`security invoker`で記録追加＋満了日更新をアトミックに実行）
+- [x] **開発用Supabaseプロジェクトへ適用完了** — SQL Editorに全文貼り付けで実行（依頼者側で実施）。
+      Table Editorで`vehicles`・`maintenance_records`の作成を依頼者が確認済み。
+      **CLIでの`supabase link`/`db push`は使わなかった**——DBパスワードや個人アクセストークンは
+      Claudeが扱わない方針のため、SQL Editorへの手動貼り付けを選択(依頼者に2択を提示して選んでもらった)
+- [x] **マイグレーション4本の解説ドキュメント生成完了** — `docs/supabase/migrations.html`
+      （4ファイルをPhase 2の一連の内容として1ページにまとめた。個別ページには分けていない）
+- [x] **RLS統合テスト一式が完成し、開発用プロジェクトに対して5件全て成功**
+      — `supabase/tests/rls.test.ts`、`supabase/tests/support/{env,test-clients,load-secret-env}.ts`、
+      `vitest.rls.config.ts`。`npm run test:rls`で実行（`npm test`には含めない）。
+      `scripts/.env`の`SUPABASE_SECRET_KEY`(開発用)を使い、Admin APIで使い捨てテストユーザー
+      2人を作成・削除する方式（公開サインアップが無効なため、通常のsignUpは使えない）。
+      本番プロジェクトを誤って対象にしないよう、ホスト名比較のガードを`env.ts`に実装済み
+- [x] **RLS統合テスト基盤の解説ドキュメント生成完了** — `docs/supabase/tests/rls.html`
+- [x] **`src/lib/supabase/database.types.ts` 生成完了** — 開発用Supabaseダッシュボード（API Docs →
+      TypeScript タブ）から依頼者が直接コピーして貼り付け。当初案内したCLI（`supabase gen types
+      typescript`、個人アクセストークン必要）ではなく、**トークンを一切作らないダッシュボード経由の
+      方法**に切り替えた（詳細は下記「判断の記録」参照）。型チェック(`tsc --noEmit`)エラー0件を確認済み。
+      `routeTree.gen.ts`と同様の自動生成ファイルのため、解説ドキュメントは生成しない方針
+- [x] **本番用Supabaseプロジェクトへのマイグレーション適用完了** — 開発用と同じSQL Editor手動貼り付け
+      方式で①〜④(set_updated_at関数/vehicles/maintenance_records/complete_shaken関数)を実行。
+      **適用前に本番プロジェクトが無料プランの自動一時停止状態だったため、依頼者が「Resume project」
+      で再開してから実行**（データは無事だった）。`vehicles`・`maintenance_records`テーブルの
+      作成を依頼者がTable Editorで確認済み。**Phase 2 完了**
 
 ## 判断の記録
 
@@ -134,36 +172,54 @@ Supabase プロジェクト作成待ちのため着手不可(下記参照)。
   存在を案内するときは、確認済みのものと未確認のものを表記で明確に区別すること。
 - **検証系コマンド（lint/typecheck/test/build/dev）は事前承認済み**で毎回止まらない。
   インストール・デプロイ・本番DB適用・大容量DL・削除は都度承認
+- **マイグレーション適用に`supabase` CLI（`link`/`db push`）を使わない方針にした。**
+  理由: これらのコマンドはDBパスワードまたは個人アクセストークンの入力を要求するが、
+  Claudeはパスワード・APIキー・トークンの入力代行を行わない方針（`docs/setup-supabase.md`
+  でも当初から「secret keyとDB Passwordは送らないでください」と依頼者に案内済み）。
+  代わりに、生成したSQLを依頼者がSupabaseダッシュボードのSQL Editorに直接貼り付けて
+  実行する運用にした。`supabase gen types typescript`も同じ理由で依頼者自身に実行してもらう。
+  次回以降、DB関連の認証情報が絡む操作が出てきたら同じ考え方で判断すること
+- **`database.types.ts`生成も、CLI（個人アクセストークン必要）ではなくSupabaseダッシュボードの
+  API Docs画面から直接コピーする方法を採用した。** 依頼者が別セッションでこの方法を見つけて提案し、
+  「秘密情報を一切作らない」という上記の方針により合致すると判断して採用。
+  手順: 開発用プロジェクトを開く→アドレスバーに`/api?page=tables-intro`を追加してAPI Docsを開く→
+  TypeScriptタブの型定義を全文コピー→Claudeに貼り付けてもらい`src/lib/supabase/database.types.ts`
+  として保存。次回、型の再生成が必要になったときも同じ方法を使うこと
 
 ---
 
 ## 次にやること
 
-Phase 3 の残り（Supabase 待ちの間、引き続き進められる）:
+**Phase 2（DB とマイグレーション）— 完了。**
 
-1. ~~**`features/vehicles/lib/*`**~~ — **完成済み**（`vehicle-schema.ts` / `vehicle-type.ts` / `shaken-required.ts`）
-2. ~~**`features/maintenance/lib/*`**~~ — **完成済み**（`work-types.ts` / `record-schema.ts` /
-   `filter-records.ts` / `sort-records.ts` / `part-suggestions.ts` / `odometer.ts`）
-3. ~~**`features/dashboard/lib/*`**~~ — **完成済み**（`since-last-service.ts` / `build-summary.ts`）
-4. ~~**`features/auth/lib/*`**~~ — **完成済み**（`login-schema.ts` / `auth-errors.ts`）
+- ~~マイグレーション4本の作成~~ — **完成済み**
+- ~~開発用プロジェクトへの適用~~ — **完成済み**
+- ~~RLS の統合テストを書く~~ — **完成済み・5件全て成功**
+   - `supabase/tests/rls.test.ts` ＋ `supabase/tests/support/{env,test-clients,load-secret-env}.ts`
+   - `vitest.rls.config.ts` を別設定として分離（`npm test` には含めない）
+   - 実行コマンド: `npm run test:rls`（要 `scripts/.env` の `SUPABASE_SECRET_KEY`、開発用のみ）
+   - 検証内容5件、全成功: ①Aは自分の車両のみ取得・Bからは空 ②AがUPDATEで
+     `user_id`をBに書き換えられない(WITH CHECK) ③Aが自分のuser_id＋Bのvehicle_idで
+     記録を挿入できない(複合FK) ④匿名ロールは両テーブルとも拒否 ⑤車両削除で
+     記録がカスケード削除される
+- ~~`database.types.ts` を生成~~ — **完成済み**
+- ~~本番用プロジェクトへの適用~~ — **完成済み**（一時停止からの再開を挟んで実行。
+  `vehicles`・`maintenance_records`テーブルの作成を依頼者が確認済み）
 
-**Phase 3 はこれで全項目完了。** 次は **Phase 2（DB とマイグレーション）** —
-**依頼者の Supabase プロジェクト作成待ち**（下記「依頼者にお願いする作業」参照）。
-DB ができ次第 Phase 4（認証配線）にすぐ入れる状態。
+**次は Phase 4（認証）に着手する**:
+Supabase クライアント（サーバー用・ブラウザ用）の実装、login/set-password 画面、
+`_authed` ルートガード、招待スクリプト（`scripts/.env` の secret key を使う）。
+実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
+先に読み直してから着手すること。
 
 ## 次のセッションで最初にやること
 
 このファイルを読んだら、`npm run test:coverage` を実行して現状の 205 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-**Phase 3（純粋ロジック）は全て完了したため、Phase 2（DB）に進めるかどうか
-依頼者に Supabase プロジェクト作成が完了したか確認すること。** 未完了なら、
-このセッションで新たに着手できる純粋ロジックの作業は無い(実装プランに
-記載の`features/*/lib/*`は全て完成済み)。
-**中断時点**: `src/lib/date/*`・`src/features/shaken/lib/*`・`src/features/vehicles/lib/*`・
-`src/features/maintenance/lib/*`・`src/features/dashboard/lib/*`・`src/features/auth/lib/*` が
-すべて完成し、コミット済み(Phase 3 完了)。次は Supabase プロジェクト作成の進捗確認、
-完了していれば Phase 2（DB とマイグレーション）に着手する。
+**中断時点**: Phase 2 完了。Phase 4（認証）に未着手。
+まだ未コミットの変更（`supabase/`・`docs/supabase/`・`vitest.rls.config.ts`・
+`package.json`・`docs/setup-supabase.md`）があるので、コミットするかどうか依頼者に確認する。
 
 ---
 
@@ -186,10 +242,12 @@ DB ができ次第 Phase 4（認証配線）にすぐ入れる状態。
 
 ## 依頼者にお願いする作業（Claude が代行できない）
 
-- [ ] **Supabase アカウント作成＋プロジェクトを 2 つ作成**（`vehicle-maintenance-dev` と `vehicle-maintenance`)
-      → 手順書 `docs/setup-supabase.md` を送付済み。**これが完了しないと Phase 2 に進めない**
-- [ ] Supabase ダッシュボードで公開サインアップを無効化（Authentication → Sign In / Providers → Email）
-- [ ] 2 プロジェクト分の `VITE_SUPABASE_URL` と `VITE_SUPABASE_PUBLISHABLE_KEY` の取得・共有
+- [x] **Supabase アカウント作成＋プロジェクトを 2 つ作成**（`vehicle-maintenance-dev` と `vehicle-maintenance`)
+      → 完了。dev: `rldmmiyhlnasghubigua`、本番: `wwvuxjvcwntqzdvyezss`（Reference ID）
+- [x] Supabase ダッシュボードで公開サインアップを無効化 — **dev/本番の両方で無効化済み**と確認済み
+- [x] 2 プロジェクト分の `VITE_SUPABASE_URL` と `VITE_SUPABASE_PUBLISHABLE_KEY` の取得・共有
+      → `.env`（dev用）と `.env.production.local`（本番用）に保存済み。両方 `.gitignore` 対象を
+      `git check-ignore -v` で確認済み。共有された URL には `/rest/v1/` が付いていたためベースURLのみ抽出
 - [ ] デプロイ時の `wrangler login`
 - [x] Cloudflare アカウント — **保有済み**
 
@@ -235,7 +293,7 @@ DB ができ次第 Phase 4（認証配線）にすぐ入れる状態。
 
 - [x] Phase 0 — 環境準備
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
-- [ ] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト）
+- [x] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト + 型生成 + 本番適用）
 - [x] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **全完成（date/shaken/vehicles/maintenance/dashboard/auth）**
 - [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
 - [ ] Phase 5 — 車両 CRUD

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RLS 統合テスト基盤</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>RLS 統合テスト基盤 — Phase 2: DB とマイグレーション</h1>
+    <div class="doc-path">vitest.rls.config.ts ／ supabase/tests/**</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      <code>supabase/migrations/*.sql</code> で作った RLS ポリシーが実際に機能しているかを、
+      開発用 Supabase プロジェクトに直接接続して検証する統合テスト一式。
+      Docker を使わずローカルの Postgres を持たない方針のため、
+      「本物のネットワーク越しに、本物の PostgREST 経由で」確認する構成になっている。
+    </p>
+    <p>
+      通常の単体テスト（<code>npm test</code>）とは目的も依存物も異なる
+      （実ネットワーク・secret key が必要）ため、<code>vitest.rls.config.ts</code> という
+      別設定に完全に分離し、<code>npm run test:rls</code> という別コマンドからのみ実行する。
+      これにより、普段の開発ループで誤ってネットワークに繋ぎに行ったり、
+      secret key が無いことでテストが失敗したりすることを防いでいる。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>ファイル</th><th>役割</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>vitest.rls.config.ts</code></td><td>RLSテスト専用のVitest設定（<code>npm test</code>には含まれない）</td></tr>
+        <tr><td><code>supabase/tests/support/load-secret-env.ts</code></td><td>テスト起動時に<code>scripts/.env</code>を読み込むセットアップファイル</td></tr>
+        <tr><td><code>supabase/tests/support/env.ts</code></td><td>必要な環境変数の検証と、本番プロジェクト誤爆防止ガード</td></tr>
+        <tr><td><code>supabase/tests/support/test-clients.ts</code></td><td>管理者クライアント／テストユーザー作成・削除のヘルパー</td></tr>
+        <tr><td><code>supabase/tests/rls.test.ts</code></td><td>実際の検証シナリオ5件</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <h3>1. vitest.rls.config.ts — 専用のテスト設定</h3>
+    <div class="doc-chunk">
+      <pre><code>export default defineConfig({
+  resolve: { tsconfigPaths: true },
+  test: {
+    name: 'rls',
+    environment: 'node',
+    include: ['supabase/tests/**/*.test.ts'],
+    setupFiles: ['./supabase/tests/support/load-secret-env.ts'],
+    testTimeout: 20000,
+    hookTimeout: 20000,
+  },
+})</code></pre>
+      <p>
+        メインの <code>vitest.config.ts</code>（unit/domプロジェクト）とは別ファイルにしている。
+        理由は用途がまったく異なるため：このテストは実際にネットワーク接続してSupabaseの
+        Admin APIでユーザーを作成・削除する。<code>include</code>を<code>supabase/tests/**</code>
+        だけに絞り、通常の<code>src/**</code>のテストとは完全に混ざらないようにしている。
+      </p>
+      <p>
+        <code>setupFiles</code> でテスト実行前に <code>load-secret-env.ts</code> を読み込み、
+        <code>testTimeout</code>/<code>hookTimeout</code> を通常より長めの20秒にしている
+        （実ネットワーク越しの複数リクエストを伴うため、デフォルトの5秒では不足しうる）。
+      </p>
+    </div>
+
+    <h3>2. load-secret-env.ts — secret key の読み込み</h3>
+    <div class="doc-chunk">
+      <pre><code>const scriptsEnvPath = resolve(process.cwd(), 'scripts/.env')
+
+if (existsSync(scriptsEnvPath)) {
+  process.loadEnvFile(scriptsEnvPath)
+}</code></pre>
+      <p>
+        Vite の環境変数読み込みは <code>VITE_</code> 接頭辞の付いた変数だけを
+        <code>import.meta.env</code> に載せる仕組みで、これは意図的な制限（secret を
+        クライアントバンドルに紛れ込ませないため）。<code>SUPABASE_SECRET_KEY</code>は
+        あえてこの仕組みの外に置きたいので、Node 標準の
+        <code>process.loadEnvFile()</code>（Node 20.6+）で<code>scripts/.env</code>を
+        直接読み、<code>process.env</code>に反映させている。
+      </p>
+      <p>
+        ファイルが無ければ何もしない（<code>existsSync</code>チェック）。
+        これにより、CI等で<code>scripts/.env</code>が存在しない環境でも、
+        このファイル自体はエラーにならず、後段の<code>env.ts</code>が
+        分かりやすいエラーメッセージを出す設計にしている。
+      </p>
+    </div>
+
+    <h3>3. env.ts — 環境変数の検証と安全装置</h3>
+    <div class="doc-chunk">
+      <pre><code>function requireEnv(name: string, value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(
+      `${name} が設定されていません。...`,
+    )
+  }
+  return value
+}
+
+export const supabaseUrl = requireEnv('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL)
+export const publishableKey = requireEnv(
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+)
+export const secretKey = requireEnv('SUPABASE_SECRET_KEY', process.env.SUPABASE_SECRET_KEY)</code></pre>
+      <p>
+        3つの環境変数を検証しつつ取り出す。<code>supabaseUrl</code>と<code>publishableKey</code>
+        は<code>import.meta.env</code>（Viteの仕組み、<code>.env</code>から自動で入る）から、
+        <code>secretKey</code>は<code>process.env</code>（<code>load-secret-env.ts</code>が
+        <code>scripts/.env</code>から手動で入れたもの）から読む、という取得経路の違いに注目。
+        欠けていれば、どのファイルに何を設定すればいいかをそのままエラーメッセージにする。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const PRODUCTION_HOST = 'wwvuxjvcwntqzdvyezss.supabase.co'
+
+if (supabaseUrl.includes(PRODUCTION_HOST)) {
+  throw new Error(
+    'RLS統合テストが本番用Supabaseプロジェクトを指しています。...',
+  )
+}</code></pre>
+      <p>
+        <strong>安全装置</strong>。このテストはテストユーザーの作成・削除を行うため、
+        万が一 <code>.env</code> が本番用の値を指していた場合、本番環境に対して
+        無関係なユーザーアカウントを作って消す、という事故になりかねない。
+        本番プロジェクトのホスト名をコードに直接書いておき、それが含まれていたら
+        テストの実行自体を即座に止める、という最後の砦を用意している。
+      </p>
+    </div>
+
+    <h3>4. test-clients.ts — クライアント生成とテストユーザーの入れ替わり</h3>
+    <div class="doc-chunk">
+      <pre><code>export function createAdminClient(): SupabaseClient {
+  return createClient(supabaseUrl, secretKey, NO_SESSION_PERSISTENCE)
+}
+
+export function createAnonClient(): SupabaseClient {
+  return createClient(supabaseUrl, publishableKey, NO_SESSION_PERSISTENCE)
+}</code></pre>
+      <p>
+        <code>createAdminClient</code>はsecret key（管理者権限）を使う。テストユーザーの
+        作成・削除にのみ使い、<strong>RLSポリシー自体の検証には使わない</strong>
+        （secret keyはRLSを無視できるため、これでSELECTしても何の検証にもならない）。
+      </p>
+      <p>
+        <code>createAnonClient</code>はpublishable key（アプリが実際に使うのと同じ鍵）。
+        セッションを持たない状態＝未ログイン(anon)の挙動を確認するのに使う一方、
+        ログイン後はセッション付きの「本物のユーザークライアント」としても使い回す
+        （下記<code>provisionTestUser</code>参照）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function provisionTestUser(admin: SupabaseClient, label: string): Promise&lt;TestUser&gt; {
+  const email = `rls-test-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`
+  const password = crypto.randomUUID()
+
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
+  if (error) {
+    throw new Error(`テストユーザー(${label})の作成に失敗しました: ${error.message}`)
+  }
+
+  const client = createAnonClient()
+  const { error: signInError } = await client.auth.signInWithPassword({ email, password })
+  ...
+  return { id: data.user.id, client }
+}</code></pre>
+      <p>
+        このアプリは公開サインアップを無効化しているため、通常のサインアップ画面と
+        同じ経路ではテストユーザーを作れない。そこで
+        <strong>Admin API（<code>admin.createUser</code>）で直接作成</strong>し、
+        <code>email_confirm: true</code>でメール確認も済ませてしまう。
+        その後、publishable keyの通常クライアントで<code>signInWithPassword</code>する
+        ことで、RLSがそのまま効く「本物のログイン済みクライアント」を得ている。
+      </p>
+      <p>
+        メールアドレスは<code>Date.now()</code>とランダム文字列で毎回ユニークにしている。
+        これはローカルDockerのようにDBを毎回リセットできる環境ではなく、
+        永続的な開発用プロジェクトに対してテストを走らせるため、
+        前回の実行が残したユーザーと衝突しないようにする工夫。
+      </p>
+      <p>
+        <code>if (error)</code>だけで<code>data.user</code>の存在チェックを省いているのは
+        手抜きではなく、<code>UserResponse</code>の型が「<code>error</code>が<code>null</code>
+        なら<code>data.user</code>は必ず存在する」という判別共用体になっているため、
+        TypeScriptがそのまま安全に絞り込んでくれる。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function deleteTestUser(admin: SupabaseClient, userId: string): Promise&lt;void&gt; {
+  const { error } = await admin.auth.admin.deleteUser(userId)
+  ...
+}</code></pre>
+      <p>
+        テストユーザーを削除するだけで、その人が作った<code>vehicles</code>・
+        <code>maintenance_records</code>も一緒に消える。マイグレーションで
+        <code>user_id references auth.users(id) on delete cascade</code>としているため、
+        後片付け用の掃除コードを別に書く必要がない。
+      </p>
+    </div>
+
+    <h3>5. rls.test.ts — 検証シナリオ本体</h3>
+    <div class="doc-chunk">
+      <pre><code>describe('RLS: vehicles / maintenance_records', () => {
+  const admin: SupabaseClient = createAdminClient()
+  let userA: TestUser
+  let userB: TestUser
+
+  beforeAll(async () => {
+    userA = await provisionTestUser(admin, 'a')
+    userB = await provisionTestUser(admin, 'b')
+  })
+
+  afterAll(async () => {
+    await deleteTestUser(admin, userA.id)
+    await deleteTestUser(admin, userB.id)
+  })</code></pre>
+      <p>
+        テストスイート全体で使い回す「持ち主A」「持ち主B」を1回だけ作り
+        （<code>beforeAll</code>）、全テスト終了後に1回だけ消す（<code>afterAll</code>）。
+        各テストごとに作り直さないのは、Admin API呼び出しは比較的遅く、
+        5つのテストごとに2ユーザー×5回作り直すと無駄に時間がかかるため。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>it('自分の車両は取得でき、他人からは空で返る', async () => {
+  const { data: vehicle } = await userA.client
+    .from('vehicles').insert({ name: 'Aの車', vehicle_type: 'car' }).select().single()
+
+  const { data: ownView } = await userA.client.from('vehicles').select().eq('id', vehicle!.id)
+  expect(ownView).toHaveLength(1)
+
+  const { data: otherView, error: otherError } = await userB.client
+    .from('vehicles').select().eq('id', vehicle!.id)
+  expect(otherError).toBeNull()
+  expect(otherView).toHaveLength(0)
+})</code></pre>
+      <p>
+        Bが「権限エラー」ではなく「0件」を受け取る点がポイント。RLSのSELECTポリシーは
+        アクセス自体を拒否するのではなく、対象行を結果セットから静かに除外する。
+        そのため<code>otherError</code>は<code>null</code>のまま、<code>otherView</code>
+        が空配列になる、という形で検証している。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>it('自分の車両のuser_idを他人に書き換えて譲渡できない(WITH CHECK)', async () => {
+  const { data: vehicle } = await userA.client
+    .from('vehicles').insert({ name: 'Aの車(譲渡テスト用)', vehicle_type: 'car' }).select().single()
+
+  const { data: updated, error } = await userA.client
+    .from('vehicles').update({ user_id: userB.id }).eq('id', vehicle!.id).select()
+
+  expect(error).not.toBeNull()
+  expect(updated).toBeNull()
+})</code></pre>
+      <p>
+        更新対象の行を見つける段階（<code>using</code>）は自分の行なので通過するが、
+        更新後の内容（<code>user_id = B</code>）が<code>with check</code>の条件
+        （<code>auth.uid() = user_id</code>）を満たさなくなるため、PostgreSQLが
+        この時点でUPDATE文全体をエラーとして拒否する。「0件更新」ではなく
+        「エラーになる」という違いが、前のSELECTのテストとの対比になっている。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>it('他人のvehicle_idを使って自分名義の記録を挿入できない(複合FK)', async () => {
+  const { data: bVehicle } = await userB.client
+    .from('vehicles').insert({ name: 'Bの車', vehicle_type: 'car' }).select().single()
+
+  const { data: record, error } = await userA.client.from('maintenance_records').insert({
+    vehicle_id: bVehicle!.id,
+    performed_on: '2026-01-01',
+    work_type: 'engine_oil',
+  })
+
+  expect(error).not.toBeNull()
+  expect(record).toBeNull()
+})</code></pre>
+      <p>
+        この挿入は<code>user_id</code>を明示していないので<code>default auth.uid()</code>
+        によりAのIDが入り、RLSのINSERTポリシー（<code>auth.uid() = user_id</code>）自体は
+        通ってしまう。それでも失敗するのは、マイグレーションで張った
+        <code>foreign key (vehicle_id, user_id) references vehicles (id, user_id)</code>
+        という複合外部キーが、「Bの車両ID」と「Aのuser_id」という存在しない組み合わせを
+        拒否するため。RLSだけでは防げない穴を、この制約が埋めていることを直接確認している。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>it('未ログイン(anon)は両テーブルとも拒否される', async () => {
+  const anon = createAnonClient()
+  const { data, error } = await anon.from('vehicles').select()
+  expect(error).not.toBeNull()
+  expect(data).toBeNull()
+  ...
+})</code></pre>
+      <p>
+        セッションを持たない状態の<code>createAnonClient()</code>を使い、
+        マイグレーションの<code>revoke all on ... from anon</code>が効いていることを確認する。
+        こちらは「0件」ではなく「エラー」になる。テーブルへのアクセス権限自体が
+        anonロールに無い（RLSの行フィルタ以前の話）ため、PostgreSQLが権限エラーを返す。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>it('車両を削除すると整備記録もカスケード削除される', async () => {
+  const { data: vehicle } = await userA.client
+    .from('vehicles').insert({ name: 'Aの車(削除テスト用)', vehicle_type: 'car' }).select().single()
+
+  await userA.client.from('maintenance_records').insert({
+    vehicle_id: vehicle!.id, performed_on: '2026-01-01', work_type: 'tire',
+  })
+
+  await userA.client.from('vehicles').delete().eq('id', vehicle!.id)
+
+  const { data: remaining } = await userA.client
+    .from('maintenance_records').select().eq('vehicle_id', vehicle!.id)
+  expect(remaining).toHaveLength(0)
+})</code></pre>
+      <p>
+        車両を1件作り、それに紐づく整備記録を1件作ってから、車両だけを削除する。
+        <code>maintenance_records</code>側の
+        <code>foreign key (vehicle_id, user_id) references vehicles (id, user_id) on delete cascade</code>
+        により、親の車両が消えると子の整備記録も自動で消えることを確認している。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-11 ／ 対象ファイル: vitest.rls.config.ts,
+    supabase/tests/support/load-secret-env.ts, supabase/tests/support/env.ts,
+    supabase/tests/support/test-clients.ts, supabase/tests/rls.test.ts
+  </footer>
+
+</div>
+</body>
+</html>

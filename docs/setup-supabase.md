@@ -75,10 +75,12 @@
 
 必要なのは次の 2 つです。**開発用と本番用の両方で取得してください。**
 
-### 3-1. Project URL
+### 3-1. Project URL（画面上は「API URL」と表示されます）
 
 `https://xxxxxxxxxxxx.supabase.co` の形式。
-**Project Settings → General**（または API 画面の上部）にあります。
+**Project Settings → Data API**（または `.../settings/api` ページ）にあります。
+**「General」タブには載っていません。** 末尾に `/rest/v1/` が付いていたら、
+そこは含めずベースURLだけを使ってください。
 
 ### 3-2. Publishable key
 

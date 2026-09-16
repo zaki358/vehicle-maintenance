@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>supabase/migrations</title>
+<link rel="stylesheet" href="../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>supabase/migrations — Phase 2: DB とマイグレーション</h1>
+    <div class="doc-path">supabase/migrations/*.sql（4ファイル）</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      このアプリのデータベース本体を作る4本のマイグレーション（DDL）をまとめて解説する。
+      車両（<code>vehicles</code>）と整備記録（<code>maintenance_records</code>）の2テーブル、
+      それぞれの Row Level Security（RLS）ポリシー、そして車検完了処理をアトミックに行う
+      RPC 関数 <code>complete_shaken</code> から成る。
+    </p>
+    <p>
+      「データ共有は完全に個人ごと」という要件を守るのが目的で、
+      <strong>RLS（行レベル）・複合外部キー（組み合わせレベル）・CHECK制約（値レベル）・
+      トランザクション関数（操作の原子性）</strong> という4段構えで
+      「自分のデータしか触れない」「中途半端な状態にならない」を保証する設計になっている。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>ファイル</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>20260907230000_create_set_updated_at_function.sql</code></td><td>function</td><td><code>updated_at</code> 列を自動更新する共通トリガー関数</td></tr>
+        <tr><td><code>20260907230100_create_vehicles.sql</code></td><td>table + RLS</td><td>車両テーブル。RLS 4ポリシー（select/insert/update/delete）</td></tr>
+        <tr><td><code>20260907230200_create_maintenance_records.sql</code></td><td>table + RLS</td><td>整備記録テーブル。複合外部キーと RLS 4ポリシー</td></tr>
+        <tr><td><code>20260907230300_create_complete_shaken_function.sql</code></td><td>function (RPC)</td><td>車検完了処理（記録追加＋満了日更新）をアトミックに行う</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <h3>1. set_updated_at() — 更新日時を自動で記録する関数</h3>
+    <div class="doc-chunk">
+      <pre><code>create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;</code></pre>
+      <p>
+        「トリガー関数」と呼ばれる特殊な関数。テーブルの行が <code>UPDATE</code> されるたびに
+        自動的に呼び出され、その行の <code>updated_at</code> 列に現在時刻（<code>now()</code>）を
+        セットする。<code>new</code> は「更新後の行の内容」を指す plpgsql の特殊変数。
+      </p>
+      <p>
+        <code>vehicles</code> にも <code>maintenance_records</code> にも使う共通部品なので、
+        両テーブルより先に作っている。「いつ更新したか」をアプリ側で毎回手入力する必要がなくなり、
+        書き忘れも起きない。
+      </p>
+    </div>
+
+    <h3>2. vehicles テーブル</h3>
+
+    <div class="doc-chunk">
+      <pre><code>create table public.vehicles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  name text not null,
+  vehicle_type text not null check (vehicle_type in ('car', 'motorcycle')),
+  shaken_expiry_date date,
+  note text not null default '',
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, user_id)
+);</code></pre>
+      <p><code>id</code> — この車両を一意に識別するID。<code>gen_random_uuid()</code> で自動採番される。</p>
+      <p>
+        <code>user_id</code> — 持ち主のID。<code>default auth.uid()</code> により、INSERT時に
+        指定しなくても今ログインしている人のIDが自動で入る。
+        <code>references auth.users(id) on delete cascade</code> は
+        「Supabase Auth のユーザーテーブルを参照し、そのユーザーが削除されたら車両も一緒に消す」という意味。
+      </p>
+      <p>
+        <code>vehicle_type</code> — <code>check</code> 制約で <code>'car'</code> か
+        <code>'motorcycle'</code> 以外の値を拒否する。DBレベルでの型安全（アプリの Zod スキーマとの二重チェック）。
+      </p>
+      <p>
+        <code>shaken_expiry_date</code> — 車検満了日。<code>not null</code> が付いていない、
+        つまり NULL 許容（250cc 以下のバイクなど車検不要な車両のため）。
+      </p>
+      <p>
+        <code>note</code> — 備考。<code>not null default ''</code> で「未入力なら空文字」を保証し、
+        NULL チェックの手間を減らしている。
+      </p>
+      <p><code>archived_at</code> — アーカイブ（論理削除）した日時。NULL なら現役の車両。</p>
+      <p>
+        <code>unique (id, user_id)</code> — <code>id</code> だけなら既に primary key で
+        ユニークだが、あえて <code>(id, user_id)</code> の組み合わせでもユニーク制約を張っている。
+        これ単体では意味が薄いが、<strong>次の maintenance_records から複合外部キーを張るための土台</strong>になる。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>create index vehicles_user_id_idx on public.vehicles (user_id);
+
+create trigger vehicles_set_updated_at
+  before update on public.vehicles
+  for each row
+  execute function public.set_updated_at();</code></pre>
+      <p>
+        インデックス — 「自分の車両だけ検索する」というクエリ（<code>where user_id = ...</code>）が
+        頻繁に発生するので、その列に検索用の索引を作って高速化する。
+      </p>
+      <p>
+        トリガー — このテーブルで <code>UPDATE</code> が起きる直前
+        （<code>before update</code>）に、先ほどの <code>set_updated_at()</code> 関数を呼び出す設定。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>alter table public.vehicles enable row level security;
+
+revoke all on public.vehicles from anon;
+grant select, insert, update, delete on public.vehicles to authenticated;</code></pre>
+      <p><code>enable row level security</code> — このテーブルに行単位のアクセス制御を有効化する。</p>
+      <p><code>revoke all ... from anon</code> — 未ログインの人からは一切のアクセス権を剥奪する。</p>
+      <p>
+        <code>grant ... to authenticated</code> — ログイン済みの人には読み書きの権限自体は与える
+        （ただし「どの行に」まではこの後のポリシーが決める）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>create policy "vehicles_select_own"
+  on public.vehicles
+  for select
+  to authenticated
+  using ((select auth.uid()) = user_id);</code></pre>
+      <p>
+        SELECT（閲覧）するときは、<code>auth.uid()</code>（今ログインしている人のID）と、
+        その行の <code>user_id</code> が一致する行だけを見せる、というルール。
+        <code>(select auth.uid())</code> とサブクエリの形で包んでいるのは、PostgreSQL が
+        実行計画をキャッシュして高速化できるようにするための書き方。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>create policy "vehicles_insert_own"
+  on public.vehicles
+  for insert
+  to authenticated
+  with check ((select auth.uid()) = user_id);</code></pre>
+      <p>
+        INSERT（新規作成）時は「作ろうとしている行の <code>user_id</code> が自分のIDと
+        一致しているか」を <code>with check</code> でチェックする。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>create policy "vehicles_update_own"
+  on public.vehicles
+  for update
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);</code></pre>
+      <p>
+        UPDATE（更新）だけ <code>using</code> と <code>with check</code> の両方がある。
+        <code>using</code> は「更新しようとしている<strong>元の行</strong>が自分のものか」、
+        <code>with check</code> は「更新<strong>した後の行</strong>も自分のものか」を見る。
+        <code>with check</code> が無いと、自分の行の <code>user_id</code> 列を他人のIDに
+        書き換えて、その行を他人に譲渡できてしまう（RLS 最頻出のミス）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>create policy "vehicles_delete_own"
+  on public.vehicles
+  for delete
+  to authenticated
+  using ((select auth.uid()) = user_id);</code></pre>
+      <p>DELETE（削除）は「自分の行かどうか」だけ見ればよいので <code>using</code> だけでよい。</p>
+    </div>
+
+    <h3>3. maintenance_records テーブル</h3>
+    <p>
+      基本構造は <code>vehicles</code> とほぼ同じ考え方の繰り返しだが、2点だけ新しい要素がある。
+    </p>
+
+    <div class="doc-chunk">
+      <pre><code>foreign key (vehicle_id, user_id) references public.vehicles (id, user_id) on delete cascade,</code></pre>
+      <p>
+        これが<strong>複合外部キー</strong>。単に <code>vehicle_id</code> だけを外部キーにすると、
+        「自分の <code>user_id</code> ＋ 他人の <code>vehicle_id</code>」という組み合わせの
+        記録を作れてしまう（RLS は行の <code>user_id</code> しか見ないため、これ自体は
+        自分のものとして通ってしまう）。<code>(vehicle_id, user_id)</code> のペアで
+        <code>vehicles</code> テーブルの <code>(id, user_id)</code>（先ほど作った unique 制約）を
+        参照させることで、「その <code>vehicle_id</code> と <code>user_id</code> の組み合わせが
+        実際に存在するか」を DB が強制的にチェックする。他人の車両IDを指定した瞬間、
+        外部キー違反で INSERT 自体が失敗する。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>check (work_type &lt;&gt; 'other' or char_length(work_type_other) &gt; 0)</code></pre>
+      <p>
+        「<code>work_type</code> が <code>'other'</code>（その他）でない、<strong>または</strong>
+        <code>work_type_other</code>（自由入力欄）に1文字以上入っている」という制約。
+        つまり「その他を選んだのに自由入力が空」というデータを、DBレベルでも拒否する
+        （アプリ側の Zod スキーマ <code>record-schema.ts</code> と同じルールを、
+        最後の砦として DB にも入れている二重チェック）。
+      </p>
+    </div>
+
+    <p>
+      以降のインデックス・トリガー・RLS・ポリシーは <code>vehicles</code> と全く同じ考え方のため省略する
+      （<code>maintenance_records_select_own</code> など4ポリシー、すべて <code>user_id</code> 基準）。
+    </p>
+
+    <h3>4. complete_shaken() — 車検完了処理をまとめて行う関数</h3>
+
+    <div class="doc-chunk">
+      <pre><code>create or replace function public.complete_shaken(
+  p_vehicle_id uuid,
+  p_performed_on date,
+  p_new_expiry_date date,
+  p_odometer_km integer default null,
+  p_part_detail text default '',
+  p_note text default ''
+)
+returns public.maintenance_records
+language plpgsql
+security invoker
+set search_path = public
+as $$</code></pre>
+      <p>
+        車検を完了したときは、①「車検を実施した」という整備記録を1件追加する、
+        ②車両の <code>shaken_expiry_date</code>（満了日）を新しい日付に更新する、という
+        <strong>2つの書き込み</strong>が必要。これを画面から2回に分けてリクエストすると、
+        1回目が成功して2回目が失敗した場合に「記録は増えたのに満了日は古いまま」という
+        中途半端な状態が起こり得る。それを防ぐため、2つの書き込みを1つの関数にまとめ、
+        <code>.rpc()</code> という仕組みで1回のトランザクションとして呼び出す。
+      </p>
+      <p>
+        <code>security invoker</code> が重要な指定で、「この関数を呼んだ人自身の権限で
+        実行する」という意味。もし <code>security definer</code>（関数の作成者の権限で実行）に
+        してしまうと、RLS を迂回して他人のデータを触れる強力な関数になってしまう。
+        <code>security invoker</code> にしておくことで、この関数の中の <code>insert</code> や
+        <code>update</code> にも、<code>vehicles</code>・<code>maintenance_records</code> の
+        RLS ポリシーがそのまま適用され続ける。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>declare
+  v_record public.maintenance_records;
+begin
+  insert into public.maintenance_records (
+    user_id, vehicle_id, performed_on, work_type, odometer_km, part_detail, note
+  ) values (
+    auth.uid(), p_vehicle_id, p_performed_on, 'shaken', p_odometer_km, p_part_detail, p_note
+  )
+  returning * into v_record;</code></pre>
+      <p>
+        まず整備記録を1件挿入する。<code>work_type</code> は <code>'shaken'</code> 固定。
+        <code>returning * into v_record</code> で、挿入した行の内容を後で返せるように
+        変数に保存している。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  update public.vehicles
+  set shaken_expiry_date = p_new_expiry_date
+  where id = p_vehicle_id
+    and user_id = auth.uid();
+
+  if not found then
+    raise exception 'vehicle not found or not owned by current user';
+  end if;
+
+  return v_record;
+end;
+$$;</code></pre>
+      <p>続いて車両の満了日を更新する。</p>
+      <p>
+        <code>if not found</code> は「直前の UPDATE が0件しか更新しなかった場合」を検知する
+        仕組みで、該当する車両が見つからなかった（＝他人の車両IDを渡された等）ときは
+        例外を発生させる。関数内で例外が起きると、直前の <code>insert</code> も含めて
+        <strong>すべて自動的に取り消される</strong>（PostgreSQL の関数は1つのトランザクション
+        として扱われるため）。これにより「記録だけ追加されて満了日が更新されない」という
+        中途半端な状態を防いでいる。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>revoke all on function public.complete_shaken(uuid, date, date, integer, text, text) from anon, public;
+grant execute on function public.complete_shaken(uuid, date, date, integer, text, text) to authenticated;</code></pre>
+      <p>
+        この関数を実行できるのはログイン済みユーザーだけ、と権限を絞っている
+        （PostgreSQL は関数を作ると初期状態で全ロールに実行権限が付くため、
+        明示的に絞り込む必要がある）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-10 ／ 対象ファイル: supabase/migrations/20260907230000_create_set_updated_at_function.sql,
+    supabase/migrations/20260907230100_create_vehicles.sql,
+    supabase/migrations/20260907230200_create_maintenance_records.sql,
+    supabase/migrations/20260907230300_create_complete_shaken_function.sql
+  </footer>
+
+</div>
+</body>
+</html>
