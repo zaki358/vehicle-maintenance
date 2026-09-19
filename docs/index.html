@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>車両メンテナンス記録 — プロジェクト解説</title>
+<link rel="stylesheet" href="assets/doc-style.css">
+<style>
+  .index-lead {
+    color: var(--doc-muted);
+    margin: 0.25rem 0 0;
+  }
+  .index-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .index-nav a {
+    display: inline-block;
+    font-size: 0.82rem;
+    color: var(--doc-accent);
+    text-decoration: none;
+    border: 1px solid var(--doc-border);
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+  }
+  .index-nav a:hover {
+    background: var(--doc-code-bg);
+  }
+  .index-group-desc {
+    color: var(--doc-muted);
+    font-size: 0.9rem;
+    margin: -0.4rem 0 1rem;
+  }
+  .index-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem;
+  }
+  .index-card {
+    display: block;
+    border: 1px solid var(--doc-border);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .index-card:hover {
+    border-color: var(--doc-accent);
+    background: var(--doc-code-bg);
+  }
+  .index-card-title {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 0.92rem;
+    color: var(--doc-accent);
+    word-break: break-all;
+  }
+  .index-card-path {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 0.76rem;
+    color: var(--doc-muted);
+    margin-top: 0.25rem;
+    word-break: break-all;
+  }
+  .index-note {
+    font-size: 0.85rem;
+    color: var(--doc-muted);
+  }
+  .index-note a {
+    color: var(--doc-accent);
+  }
+  .feature-list {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+  .feature-list li {
+    margin: 0.4rem 0;
+  }
+  .feature-list strong {
+    color: var(--doc-fg);
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 0.88rem;
+    background: var(--doc-code-bg);
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+  }
+  .pitfall-list {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+  .pitfall-list li {
+    margin: 0.5rem 0;
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>車両メンテナンス記録 — プロジェクト解説</h1>
+    <div class="doc-path">vehicle-maintenance — アプリ概要・機能・使用技術・フォルダ構成・ファイル一覧</div>
+    <p class="index-lead">
+      車とバイクの車検・整備記録を個人ごとに管理する Web アプリの解説ドキュメントです。
+      本番: <a href="https://vehicle-maintenance.y-kakeibo.workers.dev">vehicle-maintenance.y-kakeibo.workers.dev</a>
+    </p>
+    <ul class="index-nav">
+      <li><a href="#overview">概要</a></li>
+      <li><a href="#features">機能</a></li>
+      <li><a href="#stack">使用技術</a></li>
+      <li><a href="#structure">フォルダ構成</a></li>
+      <li><a href="#pitfalls">設計上の要点</a></li>
+      <li><a href="#files">ファイル別解説</a></li>
+    </ul>
+  </header>
+
+  <section class="doc-section" id="overview">
+    <h2>アプリの概要</h2>
+    <p>
+      車・バイクを複数台登録し、車検満了日と整備記録（オイル交換・タイヤ交換など）を個人ごとに記録・閲覧できる
+      モバイルファーストの Web アプリです。招待制（公開サインアップ無効）のメール＋パスワード認証で、
+      利用者が自分のデータしか見られないことを Supabase の Row Level Security（RLS）で保証しています。
+      車検の満了が近づくとアプリ内（ダッシュボード・車両詳細）で警告を表示しますが、メール／Push／LINE
+      通知や定期実行（Cron）は意図的に持たない、閲覧時に計算するだけのシンプルな設計です。
+    </p>
+  </section>
+
+  <section class="doc-section" id="features">
+    <h2>主な機能</h2>
+    <ul class="feature-list">
+      <li><strong>認証</strong> — メール＋パスワードログイン。公開サインアップは無効で、オーナーが
+        <code>scripts/invite-user.ts</code> で招待し、招待された側が <code>/set-password</code> で初期パスワードを設定する</li>
+      <li><strong>車両管理</strong> — 車種名・車両区分（車／バイク）・車検満了日（任意。250cc 以下のバイク等は
+        車検なしを想定）を登録・編集・削除</li>
+      <li><strong>整備記録</strong> — 日付・作業内容（プリセット7種＋自由入力）・走行距離・部品／型式・備考を
+        車両ごとに記録。作業内容フィルタ、部品/型式の過去入力サジェスト、走行距離の逆行（前後の記録と矛盾する値）警告つき</li>
+      <li><strong>車検アラート</strong> — 満了までの残り日数を<strong>暦月</strong>単位で判定し、
+        「残り2ヶ月→警告」「残り1ヶ月→危険」「超過→期限切れ」の3段階をダッシュボード・車両詳細に表示</li>
+      <li><strong>車検更新の記録</strong> — 受検日と有効期間（+2年／+3年）から次の満了日を<strong>制度どおり</strong>
+        自動計算（満了日の1ヶ月前以内に受検した場合は「旧満了日＋N年」に繰り越し）。計算結果は手動修正も可能で、
+        記録の追加と満了日の更新を1つのDBトランザクション（<code>complete_shaken</code> RPC）で行う</li>
+      <li><strong>ダッシュボード</strong> — 登録車両ごとに現在の走行距離・前回整備日・車検アラートを一覧表示</li>
+    </ul>
+  </section>
+
+  <section class="doc-section" id="stack">
+    <h2>使用技術・ツール・ライブラリ</h2>
+    <table class="doc-structure">
+      <thead><tr><th>領域</th><th>技術</th><th>役割</th></tr></thead>
+      <tbody>
+        <tr><td>フレームワーク</td><td><code>@tanstack/react-start</code> / <code>@tanstack/react-router</code></td><td>フルスタック React。ファイルベースルーティング・サーバー関数（<code>createServerFn</code>）</td></tr>
+        <tr><td>UI</td><td><code>react</code> 19</td><td>素の HTML フォーム中心。UI ライブラリは使わない方針</td></tr>
+        <tr><td>認証・DB</td><td><code>@supabase/supabase-js</code> / <code>@supabase/ssr</code></td><td>PostgreSQL・Auth・Row Level Security。<code>@supabase/ssr</code> でサーバー/ブラウザ両クライアントを構築</td></tr>
+        <tr><td>入力検証</td><td><code>zod</code> 4</td><td>全サーバー関数の入口でスキーマ検証（クライアント側の検証を信用しない方針）</td></tr>
+        <tr><td>日付表示</td><td><code>date-fns</code></td><td>表示整形専用（<code>formatJa</code> 系）。日付の計算には一切使わない</td></tr>
+        <tr><td>ビルド</td><td><code>vite</code> 8 / <code>typescript</code> 6</td><td></td></tr>
+        <tr><td>デプロイ</td><td><code>wrangler</code> / <code>@cloudflare/vite-plugin</code></td><td>Cloudflare Workers。実行環境は常に <code>TZ=UTC</code></td></tr>
+        <tr><td>単体・結合テスト</td><td><code>vitest</code> 5 / <code>@testing-library/react</code> / <code>jsdom</code></td><td><code>unit</code>（node）と <code>dom</code>（jsdom）の2プロジェクト構成</td></tr>
+        <tr><td>E2E テスト</td><td><code>@playwright/test</code></td><td><code>mobile</code>（Pixel 5）/ <code>desktop</code> の2プロジェクトで実ブラウザ検証</td></tr>
+        <tr><td>DB マイグレーション</td><td><code>supabase</code> CLI</td><td>マイグレーションファイルの管理のみに使用（<code>link</code>/<code>db push</code> は使わず、SQL Editor手動貼り付けで適用）</td></tr>
+        <tr><td>Lint / Format</td><td><code>eslint</code>（<code>@tanstack/eslint-config</code>） / <code>prettier</code></td><td><code>src/**/lib/**</code> から React/TanStack/Supabase の import を禁止する独自ルールを追加</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section" id="structure">
+    <h2>フォルダ構成</h2>
+    <table class="doc-structure">
+      <thead><tr><th>パス</th><th>役割</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/routes/</code></td><td>TanStack Router のファイルベースルート。URL とページ UI の対応。<code>_authed.tsx</code> が認証ガード付き共通レイアウト</td></tr>
+        <tr><td><code>src/routeTree.gen.ts</code></td><td>自動生成（コミット対象）。<code>src/routes/</code> から <code>npm run build</code>/<code>dev</code> 時に再生成される</td></tr>
+        <tr><td><code>src/features/&lt;domain&gt;/</code></td><td>機能単位のディレクトリ（<code>auth</code> / <code>vehicles</code> / <code>maintenance</code> / <code>shaken</code> / <code>dashboard</code>）。各配下に <code>lib/</code>（純粋関数）・<code>server/</code>（サーバー関数）・フォームコンポーネントを持つ</td></tr>
+        <tr><td><code>src/features/*/lib/</code></td><td>React・TanStack・Supabase を import しない純粋関数（Zod スキーマ・判定ロジック等）。単体テストの主対象</td></tr>
+        <tr><td><code>src/features/*/server/</code></td><td><code>createServerFn</code> で包んだサーバー関数。実処理は <code>deps</code> 注入可能な <code>xxxHandler</code> に分離し、Supabase クライアントをモックしてテストする</td></tr>
+        <tr><td><code>src/lib/date/</code></td><td>JST/UTC を扱う日付ユーティリティ（<code>DateString</code> ブランド型・<code>todayInJst</code>・月加算・表示整形）</td></tr>
+        <tr><td><code>src/lib/url/</code></td><td>オープンリダイレクト対策（<code>isSafeRedirectPath</code>）</td></tr>
+        <tr><td><code>src/lib/supabase/</code></td><td>環境変数検証（<code>env.ts</code>）と自動生成の DB 型（<code>database.types.ts</code>）</td></tr>
+        <tr><td><code>src/integrations/supabase/</code></td><td>Supabase SDK を実際に配線する層（ブラウザ/サーバー クライアント生成）。<code>lib/</code> の import 禁止ルールと矛盾しないよう分離</td></tr>
+        <tr><td><code>src/test/</code></td><td>Vitest のグローバルセットアップ（<code>@testing-library/jest-dom</code> 等）</td></tr>
+        <tr><td><code>scripts/</code></td><td>依頼者がローカルで実行する運用スクリプト（<code>invite-user.ts</code>）。Claude は実行しない</td></tr>
+        <tr><td><code>supabase/migrations/</code></td><td>DB マイグレーション SQL（5本）。テーブル定義・RLS ポリシー・<code>complete_shaken</code> 関数</td></tr>
+        <tr><td><code>supabase/tests/</code></td><td>RLS を守る統合テスト（開発用 Supabase プロジェクトに対して実行。<code>npm run test:rls</code>）</td></tr>
+        <tr><td><code>e2e/</code></td><td>Playwright E2E テスト一式（<code>support/</code> ヘルパー＋<code>tests/</code> 8シナリオ）</td></tr>
+        <tr><td><code>docs/</code></td><td>本ドキュメント。ソースファイル単位の解説ページと、このプロジェクト全体解説ページ</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section" id="pitfalls">
+    <h2>設計上の要点</h2>
+    <ul class="pitfall-list">
+      <li><strong>JST と UTC</strong> — Cloudflare Workers の実行環境は常に <code>TZ=UTC</code> だが利用者は JST。
+        カレンダー計算に生の <code>Date</code> を使わず、<code>todayInJst()</code> と branded 型 <code>DateString</code> で
+        「JST の暦日」だけを扱う。表示整形（<code>date-fns</code>）は UTC ゲッターで実装し、環境依存を避けている</li>
+      <li><strong>Supabase クライアントのメモ化禁止</strong> — サーバー用クライアントをモジュールスコープでメモ化すると、
+        Workers の isolate 再利用で他人のセッションを掴む危険があるため、リクエストのたびに生成する</li>
+      <li><strong>RLS の UPDATE ポリシー</strong> — <code>USING</code> と <code>WITH CHECK</code> の両方を書き、
+        所有権の書き換え（他人の <code>user_id</code> への付け替え）を防ぐ</li>
+      <li><strong>境界のある純粋関数</strong> — <code>src/**/lib/**</code> は ESLint ルールで React/TanStack/Supabase の
+        import を禁止。テスト容易性とロジックの独立性を保証する</li>
+      <li><strong>全書き込みはサーバー側で Zod 検証</strong> — サーバー関数は実 HTTP エンドポイントのため、
+        クライアント側の入力チェックを信用しない</li>
+    </ul>
+  </section>
+
+  <section class="doc-section" id="files">
+    <h2>ファイル別解説（全64ファイル）</h2>
+    <p class="index-group-desc">機能（feature）単位でグループ化した、各ソースファイルの個別解説ページへのリンク集です。</p>
+
+    <h3 id="routes">ルート / ページ（src/routes）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/routes/_authed.html"><div class="index-card-title">_authed.tsx</div><div class="index-card-path">共通レイアウト・認証ガード</div></a>
+      <a class="index-card" href="src/routes/_authed.index.html"><div class="index-card-title">_authed.index.tsx</div><div class="index-card-path">ダッシュボード（トップページ）</div></a>
+      <a class="index-card" href="src/routes/login.html"><div class="index-card-title">login.tsx</div><div class="index-card-path">ログインページ</div></a>
+      <a class="index-card" href="src/routes/set-password.html"><div class="index-card-title">set-password.tsx</div><div class="index-card-path">招待後のパスワード設定</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.index.html"><div class="index-card-title">_authed.vehicles.index.tsx</div><div class="index-card-path">車両一覧</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.new.html"><div class="index-card-title">_authed.vehicles.new.tsx</div><div class="index-card-path">車両新規登録</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.html"><div class="index-card-title">_authed.vehicles.$vehicleId.tsx</div><div class="index-card-path">車両詳細レイアウト</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.index.html"><div class="index-card-title">_authed.vehicles.$vehicleId.index.tsx</div><div class="index-card-path">車両詳細・整備記録一覧</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.edit.html"><div class="index-card-title">_authed.vehicles.$vehicleId.edit.tsx</div><div class="index-card-path">車両編集</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.shaken.html"><div class="index-card-title">_authed.vehicles.$vehicleId.shaken.tsx</div><div class="index-card-path">車検完了記録ページ</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.records.new.html"><div class="index-card-title">_authed.vehicles.$vehicleId.records.new.tsx</div><div class="index-card-path">整備記録の新規登録</div></a>
+      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.html"><div class="index-card-title">…records.$recordId.edit.tsx</div><div class="index-card-path">整備記録の編集</div></a>
+    </div>
+
+    <h3 id="auth">機能: 認証（src/features/auth）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/features/auth/require-user.html"><div class="index-card-title">require-user.ts</div><div class="index-card-path">認証必須ルートのガード</div></a>
+      <a class="index-card" href="src/features/auth/lib/auth-errors.html"><div class="index-card-title">lib/auth-errors.ts</div></a>
+      <a class="index-card" href="src/features/auth/lib/login-schema.html"><div class="index-card-title">lib/login-schema.ts</div></a>
+      <a class="index-card" href="src/features/auth/server/login.html"><div class="index-card-title">server/login.ts</div></a>
+      <a class="index-card" href="src/features/auth/server/logout.html"><div class="index-card-title">server/logout.ts</div></a>
+      <a class="index-card" href="src/features/auth/server/get-session.html"><div class="index-card-title">server/get-session.ts</div></a>
+    </div>
+
+    <h3 id="vehicles">機能: 車両（src/features/vehicles）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/features/vehicles/vehicle-form.html"><div class="index-card-title">vehicle-form.tsx</div></a>
+      <a class="index-card" href="src/features/vehicles/lib/vehicle-schema.html"><div class="index-card-title">lib/vehicle-schema.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/lib/vehicle-id-schema.html"><div class="index-card-title">lib/vehicle-id-schema.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/lib/vehicle-type.html"><div class="index-card-title">lib/vehicle-type.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/lib/shaken-required.html"><div class="index-card-title">lib/shaken-required.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/server/create.html"><div class="index-card-title">server/create.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/server/get.html"><div class="index-card-title">server/get.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/server/list.html"><div class="index-card-title">server/list.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/server/update.html"><div class="index-card-title">server/update.ts</div></a>
+      <a class="index-card" href="src/features/vehicles/server/delete.html"><div class="index-card-title">server/delete.ts</div></a>
+    </div>
+
+    <h3 id="maintenance">機能: 整備記録（src/features/maintenance）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/features/maintenance/record-form.html"><div class="index-card-title">record-form.tsx</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/record-schema.html"><div class="index-card-title">lib/record-schema.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/record-id-schema.html"><div class="index-card-title">lib/record-id-schema.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/vehicle-scope-schema.html"><div class="index-card-title">lib/vehicle-scope-schema.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/work-types.html"><div class="index-card-title">lib/work-types.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/odometer.html"><div class="index-card-title">lib/odometer.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/part-suggestions.html"><div class="index-card-title">lib/part-suggestions.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/sort-records.html"><div class="index-card-title">lib/sort-records.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/lib/filter-records.html"><div class="index-card-title">lib/filter-records.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/create.html"><div class="index-card-title">server/create.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/list.html"><div class="index-card-title">server/list.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/list-all.html"><div class="index-card-title">server/list-all.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/list-part-details.html"><div class="index-card-title">server/list-part-details.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/update.html"><div class="index-card-title">server/update.ts</div></a>
+      <a class="index-card" href="src/features/maintenance/server/delete.html"><div class="index-card-title">server/delete.ts</div></a>
+    </div>
+
+    <h3 id="shaken">機能: 車検（src/features/shaken）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/features/shaken/complete-shaken-form.html"><div class="index-card-title">complete-shaken-form.tsx</div></a>
+      <a class="index-card" href="src/features/shaken/lib/alert-tier.html"><div class="index-card-title">lib/alert-tier.ts</div></a>
+      <a class="index-card" href="src/features/shaken/lib/days-remaining.html"><div class="index-card-title">lib/days-remaining.ts</div></a>
+      <a class="index-card" href="src/features/shaken/lib/renewal.html"><div class="index-card-title">lib/renewal.ts</div></a>
+      <a class="index-card" href="src/features/shaken/lib/messages.html"><div class="index-card-title">lib/messages.ts</div></a>
+      <a class="index-card" href="src/features/shaken/lib/complete-shaken-schema.html"><div class="index-card-title">lib/complete-shaken-schema.ts</div></a>
+      <a class="index-card" href="src/features/shaken/server/complete-shaken.html"><div class="index-card-title">server/complete-shaken.ts</div></a>
+    </div>
+
+    <h3 id="dashboard">機能: ダッシュボード（src/features/dashboard）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/features/dashboard/lib/build-summary.html"><div class="index-card-title">lib/build-summary.ts</div></a>
+      <a class="index-card" href="src/features/dashboard/lib/since-last-service.html"><div class="index-card-title">lib/since-last-service.ts</div></a>
+    </div>
+
+    <h3 id="lib">共通ライブラリ（src/lib）</h3>
+    <p class="index-group-desc">React / TanStack / Supabase に依存しない純粋関数群。</p>
+    <div class="index-grid">
+      <a class="index-card" href="src/lib/date/jst.html"><div class="index-card-title">date/jst.ts</div></a>
+      <a class="index-card" href="src/lib/date/date-string.html"><div class="index-card-title">date/date-string.ts</div></a>
+      <a class="index-card" href="src/lib/date/date-string-schema.html"><div class="index-card-title">date/date-string-schema.ts</div></a>
+      <a class="index-card" href="src/lib/date/add-months.html"><div class="index-card-title">date/add-months.ts</div></a>
+      <a class="index-card" href="src/lib/date/format-ja.html"><div class="index-card-title">date/format-ja.ts</div></a>
+      <a class="index-card" href="src/lib/url/safe-redirect.html"><div class="index-card-title">url/safe-redirect.ts</div><div class="index-card-path">オープンリダイレクト対策</div></a>
+      <a class="index-card" href="src/lib/supabase/env.html"><div class="index-card-title">supabase/env.ts</div></a>
+    </div>
+
+    <h3 id="integrations">外部連携（src/integrations/supabase）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="src/integrations/supabase/client.html"><div class="index-card-title">client.ts</div></a>
+      <a class="index-card" href="src/integrations/supabase/server.html"><div class="index-card-title">server.ts</div></a>
+    </div>
+
+    <h3 id="scripts">スクリプト（scripts）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="scripts/invite-user.html"><div class="index-card-title">invite-user.ts</div></a>
+    </div>
+
+    <h3 id="supabase">Supabase / DB（supabase）</h3>
+    <div class="index-grid">
+      <a class="index-card" href="supabase/migrations.html"><div class="index-card-title">migrations/*.sql</div><div class="index-card-path">マイグレーション5本</div></a>
+      <a class="index-card" href="supabase/tests/rls.html"><div class="index-card-title">tests/rls</div><div class="index-card-path">RLS 統合テスト基盤</div></a>
+    </div>
+
+    <h3 id="e2e">E2E テスト</h3>
+    <div class="index-grid">
+      <a class="index-card" href="e2e.html"><div class="index-card-title">e2e/*</div><div class="index-card-path">Playwright E2E テスト一式（8シナリオ）</div></a>
+    </div>
+
+    <p class="index-note">
+      関連: <a href="setup-supabase.md">setup-supabase.md</a>（Supabase セットアップ手順・Markdown）
+    </p>
+  </section>
+
+  <footer class="doc-footer">
+    このページはプロジェクト全体の解説（概要・機能・使用技術・フォルダ構成）と、docs/ 配下の
+    ファイル別解説ドキュメントへの目次を兼ねています。各ソースファイルが完成するたびに生成される
+    個別ページとは別に、フェーズの区切りで手動で作成・更新します。
+  </footer>
+
+</div>
+</body>
+</html>
