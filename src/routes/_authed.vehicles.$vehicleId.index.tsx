@@ -49,6 +49,8 @@ function VehicleDetailPage() {
   const [deletingVehicle, setDeletingVehicle] = useState(false)
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null)
   const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | 'all'>('all')
+  const [deleteVehicleError, setDeleteVehicleError] = useState<string | null>(null)
+  const [deleteRecordError, setDeleteRecordError] = useState<string | null>(null)
 
   async function handleDeleteVehicle() {
     const confirmed = window.confirm(`「${vehicle.name}」を削除します。整備記録も全て削除されます。よろしいですか？`)
@@ -56,9 +58,12 @@ function VehicleDetailPage() {
       return
     }
     setDeletingVehicle(true)
+    setDeleteVehicleError(null)
     try {
       await deleteVehicleFn({ data: { id: vehicle.id } })
       await navigate({ to: '/vehicles' })
+    } catch {
+      setDeleteVehicleError('削除に失敗しました。時間をおいて再度お試しください。')
     } finally {
       setDeletingVehicle(false)
     }
@@ -78,9 +83,12 @@ function VehicleDetailPage() {
       return
     }
     setDeletingRecordId(recordId)
+    setDeleteRecordError(null)
     try {
       await deleteRecordFn({ data: { id: recordId } })
       await router.invalidate()
+    } catch {
+      setDeleteRecordError('削除に失敗しました。時間をおいて再度お試しください。')
     } finally {
       setDeletingRecordId(null)
     }
@@ -117,6 +125,7 @@ function VehicleDetailPage() {
       <button type="button" onClick={handleDeleteVehicle} disabled={deletingVehicle}>
         削除
       </button>
+      {deleteVehicleError && <p role="alert">{deleteVehicleError}</p>}
 
       <section>
         <h2>整備記録</h2>
@@ -166,6 +175,7 @@ function VehicleDetailPage() {
             ))}
           </ul>
         )}
+        {deleteRecordError && <p role="alert">{deleteRecordError}</p>}
       </section>
 
       <p>

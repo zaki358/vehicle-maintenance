@@ -21,6 +21,10 @@ import type { Database } from '@/lib/supabase/database.types'
 export function createSupabaseServerClient() {
   const env = getSupabaseEnv()
   return createServerClient<Database>(env.url, env.publishableKey, {
+    // httpOnly は意図的に既定値(false)のまま（招待リンクのハッシュフラグメント
+    // 検出やトークンリフレッシュに必要）。その代わり secure は明示的に立てて、
+    // 平文HTTP経由でのCookie送信を防ぐ多層防御にする。
+    cookieOptions: { secure: true },
     cookies: {
       getAll() {
         return Object.entries(getCookies()).map(([name, value]) => ({ name, value }))

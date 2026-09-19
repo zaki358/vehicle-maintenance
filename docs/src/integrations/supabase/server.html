@@ -52,6 +52,7 @@
       <pre><code>export function createSupabaseServerClient() {
   const env = getSupabaseEnv()
   return createServerClient&lt;Database&gt;(env.url, env.publishableKey, {
+    cookieOptions: { secure: true },
     cookies: { ... },
   })
 }</code></pre>
@@ -95,9 +96,8 @@
 
     <div class="doc-chunk">
       <p>
-        <strong>Cookie のオプションはあえて指定せず、<code>@supabase/ssr</code> の
-        デフォルト（<code>httpOnly: false</code> / <code>sameSite: 'lax'</code> /
-        <code>path: '/'</code>）のままにしています。</strong>
+        <strong><code>httpOnly</code> はあえて指定せず、<code>@supabase/ssr</code> の
+        デフォルト（<code>false</code>）のままにしています。</strong>
         「セッション Cookie は httpOnly にすべき」という一般的なセキュリティ知識とは
         逆に見えますが、Supabase 公式ドキュメント（Auth Server-Side Rendering /
         Advanced guide）が明示的に「不要」としている設計です。理由は、ブラウザ側の
@@ -106,6 +106,17 @@
         httpOnly にしてしまうとブラウザ側クライアントが Cookie を一切読めなくなり、
         トークンのリフレッシュや <code>set-password.tsx</code> の招待リンク処理
         （<code>detectSessionInUrl</code>）が壊れます。
+      </p>
+      <p>
+        <strong>Phase 8のセキュリティレビューで、<code>secure</code> 属性も
+        指定されていないことが指摘され、<code>cookieOptions: { secure: true }</code>
+        を追加しました。</strong> <code>httpOnly</code> をあえて外している設計だからこそ、
+        <code>secure</code> は多層防御として必ず立てるべき、という判断です。
+        <code>secure: true</code> にすると Cookie は HTTPS 接続でしか送信されなくなり、
+        平文HTTP経由での盗聴・改ざんを防ぎます。<code>localhost</code> は
+        主要ブラウザが「安全なコンテキスト」として特別扱いするため、
+        <code>vite dev</code>（HTTP）でのログイン動作には影響しません。
+        本番の Cloudflare Workers は常にHTTPSなので、こちらも問題ありません。
       </p>
     </div>
 

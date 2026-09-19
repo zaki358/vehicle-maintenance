@@ -42,7 +42,7 @@
         <tr><td><code>supabase/tests/support/load-secret-env.ts</code></td><td>テスト起動時に<code>scripts/.env</code>を読み込むセットアップファイル</td></tr>
         <tr><td><code>supabase/tests/support/env.ts</code></td><td>必要な環境変数の検証と、本番プロジェクト誤爆防止ガード</td></tr>
         <tr><td><code>supabase/tests/support/test-clients.ts</code></td><td>管理者クライアント／テストユーザー作成・削除のヘルパー</td></tr>
-        <tr><td><code>supabase/tests/rls.test.ts</code></td><td>実際の検証シナリオ5件</td></tr>
+        <tr><td><code>supabase/tests/rls.test.ts</code></td><td>実際の検証シナリオ9件（Phase 8で4件追加）</td></tr>
       </tbody>
     </table>
   </section>
@@ -309,6 +309,80 @@ export function createAnonClient(): SupabaseClient {
     </div>
 
     <div class="doc-chunk">
+      <p>
+        <strong>Phase 8のDBレビューで、実装は正しいが回帰テストが無い箇所
+        （テストギャップ）が4件指摘され、追加した。</strong>
+        いずれも「実装済みの防御が本当に効いているか」を確認するテストで、
+        アプリのコード自体は変更していない（<code>complete_shaken</code>の
+        所有権チェック順序修正は例外 — 別途 <code>supabase/migrations/
+        20260919220000_fix_complete_shaken_ownership_check.sql</code> 参照）。
+      </p>
+      <pre><code>it('自分の整備記録のvehicle_idを他人の車両IDに書き換えられない(複合FK・UPDATE経由)', async () => {
+  ...
+  const { data: updated, error } = await userA.client
+    .from('maintenance_records')
+    .update({ vehicle_id: bVehicle!.id })
+    .eq('id', record!.id)
+    .select()
+
+  expect(error).not.toBeNull()
+  expect(updated).toBeNull()
+})</code></pre>
+      <p>
+        既存の複合FKテストはINSERT経路のみを確認していたが、同じ複合外部キーは
+        UPDATE文でも効くはずである。<code>vehicle_id</code>を他人の車両IDへ
+        書き換えるUPDATEも同様に拒否されることを確認する。
+      </p>
+      <pre><code>it('自分の整備記録のuser_idを他人に書き換えて譲渡できない(WITH CHECK)', async () => {
+  ...
+  const { data: updated, error } = await userA.client
+    .from('maintenance_records')
+    .update({ user_id: userB.id })
+    .eq('id', record!.id)
+    .select()
+
+  expect(error).not.toBeNull()
+  expect(updated).toBeNull()
+})</code></pre>
+      <p>
+        <code>vehicles_update_own</code>のWITH CHECKは既にテストされていたが、
+        <code>maintenance_records_update_own</code>の方は未検証だった。
+        同じ譲渡攻撃パターンを<code>maintenance_records</code>側にも揃えた。
+      </p>
+      <pre><code>it('complete_shaken: 自分の車両なら整備記録の追加と満了日更新が1回のRPCで両方反映される', async () => {
+  ...
+  const { data: result, error } = await userA.client.rpc('complete_shaken', {
+    p_vehicle_id: vehicle!.id,
+    p_performed_on: '2026-01-01',
+    p_new_expiry_date: '2028-01-01',
+    p_odometer_km: 12345,
+  })
+
+  expect(error).toBeNull()
+  expect(result?.work_type).toBe('shaken')
+  ...
+})
+
+it('complete_shaken: 他人の車両IDを渡すと拒否され、記録も満了日もどちらも変化しない', async () => {
+  ...
+  const { data: result, error } = await userA.client.rpc('complete_shaken', {
+    p_vehicle_id: bVehicle!.id,
+    ...
+  })
+
+  expect(error).not.toBeNull()
+  expect(result).toBeNull()
+})</code></pre>
+      <p>
+        <code>complete_shaken</code> RPC自体を呼ぶテストがそれまで一切無かった。
+        正常系（自分の車両で記録追加と満了日更新が両方反映される）と
+        異常系（他人の車両IDを渡すと拒否され、どちらのテーブルも変化しない）の
+        両方を追加し、「1トランザクションで両方成功するか、どちらも変化しないか」
+        という<code>complete_shaken</code>の存在理由そのものを直接検証している。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
       <pre><code>it('未ログイン(anon)は両テーブルとも拒否される', async () => {
   const anon = createAnonClient()
   const { data, error } = await anon.from('vehicles').select()
@@ -350,7 +424,7 @@ export function createAnonClient(): SupabaseClient {
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-11 ／ 対象ファイル: vitest.rls.config.ts,
+    生成日: 2026-09-19（Phase 8でテストケース4件を追記） ／ 対象ファイル: vitest.rls.config.ts,
     supabase/tests/support/load-secret-env.ts, supabase/tests/support/env.ts,
     supabase/tests/support/test-clients.ts, supabase/tests/rls.test.ts
   </footer>

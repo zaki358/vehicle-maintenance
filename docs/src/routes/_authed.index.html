@@ -133,10 +133,34 @@ function shakenAlertFor(summary: VehicleSummary) {
       </p>
     </div>
 
+    <div class="doc-chunk">
+      <pre><code>async function handleLogout() {
+  setLoggingOut(true)
+  setLogoutError(null)
+  try {
+    await logoutFn()
+    await navigate({ to: '/login', replace: true })
+  } catch {
+    setLogoutError('ログアウトに失敗しました。時間をおいて再度お試しください。')
+  } finally {
+    setLoggingOut(false)
+  }
+}</code></pre>
+      <p>
+        <strong>Phase 8のコードレビューで、以前はここに <code>catch</code> が無く、
+        <code>logoutFn</code> が失敗（ネットワークエラー等）すると例外が
+        未処理のまま握りつぶされ、ボタンが活性に戻るだけで利用者には何も
+        表示されないことが指摘され、修正しました。</strong>
+        車両・整備記録の登録／更新フォーム（<code>vehicle-form.tsx</code> など）は
+        元から同じパターンで <code>catch</code> していたため、ここも揃えることで
+        「失敗したら必ず画面にエラーを出す」という一貫性を保っています。
+      </p>
+    </div>
+
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.index.tsx
+    生成日: 2026-09-19（Phase 8でログアウト失敗時のエラー表示を追加） ／ 対象ファイル: src/routes/_authed.index.tsx
   </footer>
 
 </div>

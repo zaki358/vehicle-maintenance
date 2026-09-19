@@ -30,6 +30,15 @@
       クライアント側の検証はあくまで UX のためのショートカットで、
       安全境界はサーバー関数側の検証です。
     </p>
+    <p>
+      <strong>Phase 8のセキュリティレビューで、<code>?redirect=</code> パラメータに
+      絶対URL（<code>https://evil.example.com</code>）を仕込まれるとログイン成功直後に
+      外部サイトへ強制遷移させられる「オープンリダイレクト」の脆弱性が見つかり、修正しました。</strong>
+      <code>loginSearchSchema</code> に <code>isSafeRedirectPath</code>
+      （<a href="../lib/url/safe-redirect.html"><code>src/lib/url/safe-redirect.ts</code></a>）
+      によるサニタイズを追加し、安全な相対パスでなければ既定の遷移先
+      （<code>'/'</code>）にフォールバックするようにしています。
+    </p>
   </section>
 
   <section class="doc-section">
@@ -39,7 +48,7 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>loginSearchSchema</code></td><td>const</td><td>URL クエリ <code>?redirect=</code> を検証する Zod スキーマ</td></tr>
+        <tr><td><code>loginSearchSchema</code></td><td>const</td><td>URL クエリ <code>?redirect=</code> を検証し、安全な相対パスでなければ <code>undefined</code> に落とす Zod スキーマ</td></tr>
         <tr><td><code>Route</code></td><td>const（export）</td><td><code>/login</code> ルートの定義</td></tr>
         <tr><td><code>LoginPage</code></td><td>function（component）</td><td>フォームの状態管理と送信処理</td></tr>
       </tbody>
@@ -51,7 +60,10 @@
 
     <div class="doc-chunk">
       <pre><code>const loginSearchSchema = z.object({
-  redirect: z.string().optional(),
+  redirect: z
+    .string()
+    .transform((value) => (isSafeRedirectPath(value) ? value : undefined))
+    .optional(),
 })
 
 export const Route = createFileRoute('/login')({
@@ -63,6 +75,15 @@ export const Route = createFileRoute('/login')({
         型安全になります。<code>_authed.tsx</code> の <code>requireUser</code> が
         投げるリダイレクトの <code>search: { redirect: redirectTo }</code> を
         受け取るための宣言です。
+      </p>
+      <p>
+        <code>redirect</code> はアプリ内部（<code>requireUser</code>）だけでなく、
+        URL を直接いじる第三者からも差し込める値です。<code>.transform()</code> で
+        <code>isSafeRedirectPath</code> によるチェックを通し、安全な相対パス
+        （<code>/</code> で始まり、<code>//</code> にも <code>/\</code> にもならない）
+        でなければ黙って <code>undefined</code> に落とします。<code>.refine()</code>
+        で例外を投げる方式にしなかったのは、不正な値が来てもルート自体は普通に
+        表示させたい（エラー画面にしたくない）ためです。
       </p>
     </div>
 
@@ -97,7 +118,11 @@ try {
         <code>redirect</code> が「型システムが知っているルート一覧のどれか」
         ではなく、実行時に決まる任意の文字列だからです。<code>href</code> は
         TanStack Router が型安全性を諦めて任意の文字列パスへ遷移するための
-        エスケープハッチとして用意しているオプションです。
+        エスケープハッチとして用意しているオプションです。<code>href</code> に
+        絶対URLを渡すと TanStack Router はフルページ遷移（<code>window.location.href</code>）
+        にフォールバックするため、以前はここが正にオープンリダイレクトの入口でした。
+        上の <code>loginSearchSchema</code> が既に安全な相対パスであることを
+        保証しているので、この <code>href</code> は今は安全です。
       </p>
     </div>
 

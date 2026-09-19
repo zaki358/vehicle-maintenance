@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>safe-redirect.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>safe-redirect.ts</h1>
+    <div class="doc-path">src/lib/url/safe-redirect.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      Phase 8のセキュリティレビューで見つかった<strong>オープンリダイレクト</strong>の
+      脆弱性を塞ぐための、たった1つの純粋関数だけを持つファイルです。
+    </p>
+    <p>
+      ログイン画面（<code>/login</code>）は <code>?redirect=/vehicles</code> のような
+      クエリパラメータを受け取り、ログイン成功後にそこへ遷移します。
+      この値は <code>_authed.tsx</code>（未ログイン時のガード）が
+      自動的に付ける場合は常に安全なアプリ内パスですが、
+      <strong>URLを直接いじれる第三者は、ここに任意の絶対URL
+      （例: <code>https://evil.example.com</code>）を差し込めます。</strong>
+      検証なしにこの値をそのままブラウザの遷移先へ渡すと、
+      「正規サイトでログインした直後に外部サイトへ強制的に飛ばされる」
+      というフィッシングに悪用できる状態になります。
+      <code>isSafeRedirectPath</code> は、この値が「アプリ内の相対パスだけ」
+      であることを保証するための判定関数です。
+    </p>
+    <p>
+      <code>src/**/lib/**</code> の他のファイルと同じく、
+      React・TanStack・Supabase を一切importしない純粋関数です
+      （プロジェクトのESLint境界ルールにより強制されています）。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>isSafeRedirectPath</code></td><td>function（export）</td><td>値が安全なアプリ内相対パスかどうかを判定する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function isSafeRedirectPath(value: string): boolean {
+  if (!value.startsWith('/')) {
+    return false
+  }
+  if (value.startsWith('//') || value.startsWith('/\\')) {
+    return false
+  }
+  return true
+}</code></pre>
+      <p>
+        3つのチェックだけで構成されています。
+      </p>
+      <ul>
+        <li>
+          <strong><code>'/'</code> で始まらない値を拒否する。</strong>
+          <code>https://evil.example.com</code> のような絶対URLはこれだけで弾かれます。
+          <code>javascript:alert(1)</code> のような危険なスキームも同様です
+          （TanStack Router 自身も別途 <code>javascript:</code> 等を拒否しますが、
+          そもそも <code>/</code> で始まらないのでここで先に弾かれます）。
+        </li>
+        <li>
+          <strong><code>'//'</code> で始まる値を拒否する。</strong>
+          <code>//evil.example.com</code> は「プロトコル相対URL」と呼ばれる形式で、
+          ブラウザは現在のプロトコル（<code>https:</code>）を補って
+          <code>https://evil.example.com</code> として解釈します。先頭が
+          <code>/</code> 1文字だけでは見抜けないため、専用のチェックが必要です。
+        </li>
+        <li>
+          <strong><code>'/\'</code>（スラッシュに続くバックスラッシュ）で始まる値も拒否する。</strong>
+          一部のブラウザはURL解釈の際にバックスラッシュをスラッシュと同一視するため、
+          <code>/\evil.example.com</code> が結果的に <code>//evil.example.com</code>
+          と同じ扱いになりうります。見た目上は <code>/</code> で始まる「相対パスらしきもの」
+          なので、このチェックが無いと素通りしてしまいます。
+        </li>
+      </ul>
+      <p>
+        使う側（<code>src/routes/login.tsx</code> の <code>loginSearchSchema</code>）は、
+        この関数が <code>false</code> を返した値を例外にはせず、
+        黙って安全な既定値（<code>'/'</code>）にフォールバックさせています。
+        「不正な値が来たらエラー画面ではなく、普通にトップへ送る」という
+        UX上の判断です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/lib/url/safe-redirect.ts
+  </footer>
+
+</div>
+</body>
+</html>

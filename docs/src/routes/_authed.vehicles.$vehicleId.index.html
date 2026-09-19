@@ -107,9 +107,12 @@
     return
   }
   setDeletingRecordId(recordId)
+  setDeleteRecordError(null)
   try {
     await deleteRecordFn({ data: { id: recordId } })
     await router.invalidate()
+  } catch {
+    setDeleteRecordError('削除に失敗しました。時間をおいて再度お試しください。')
   } finally {
     setDeletingRecordId(null)
   }
@@ -122,6 +125,14 @@
         <code>deletingRecordId</code> に保持し、その行のボタンだけを
         <code>disabled</code> にすることで、複数行を誤って連打しても
         他の行の操作は妨げません。
+      </p>
+      <p>
+        <strong>Phase 8のコードレビューで、<code>handleDeleteVehicle</code> と
+        この <code>handleDeleteRecord</code> の両方に <code>catch</code> が無く、
+        削除失敗時にエラーが握りつぶされることが指摘され、修正しました。</strong>
+        それぞれ <code>deleteVehicleError</code>／<code>deleteRecordError</code> という
+        専用の state を持ち、失敗時は <code>role="alert"</code> の段落で
+        メッセージを表示します。
       </p>
     </div>
 
@@ -160,7 +171,7 @@ const shakenMessage =
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.index.tsx
+    生成日: 2026-09-19（Phase 8で削除失敗時のエラー表示を追加） ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.index.tsx
   </footer>
 
 </div>

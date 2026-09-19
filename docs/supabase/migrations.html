@@ -41,6 +41,7 @@
         <tr><td><code>20260907230100_create_vehicles.sql</code></td><td>table + RLS</td><td>車両テーブル。RLS 4ポリシー（select/insert/update/delete）</td></tr>
         <tr><td><code>20260907230200_create_maintenance_records.sql</code></td><td>table + RLS</td><td>整備記録テーブル。複合外部キーと RLS 4ポリシー</td></tr>
         <tr><td><code>20260907230300_create_complete_shaken_function.sql</code></td><td>function (RPC)</td><td>車検完了処理（記録追加＋満了日更新）をアトミックに行う</td></tr>
+        <tr><td><code>20260919220000_fix_complete_shaken_ownership_check.sql</code></td><td>function (RPC・再定義)</td><td>Phase 8: <code>complete_shaken</code> の所有権チェック順序を修正</td></tr>
       </tbody>
     </table>
   </section>
@@ -314,13 +315,77 @@ grant execute on function public.complete_shaken(uuid, date, date, integer, text
       </p>
     </div>
 
+    <h3>5. Phase 8: complete_shaken の所有権チェック順序修正</h3>
+    <p>
+      Phase 8のコードレビューで、上記4.の実装には抜け穴ではなく
+      <strong>情報漏洩</strong>の問題があると指摘された。<code>p_vehicle_id</code> に
+      他人の車両IDを渡した場合、実際に拒否はされる（複合外部キーが機能するため
+      セキュリティ上は安全）が、拒否されるタイミングが「所有権チェック
+      （<code>update ... if not found</code>）」より<strong>前</strong>の
+      <code>insert</code> の時点になってしまい、意図した
+      <code>'vehicle not found or not owned by current user'</code> ではなく、
+      Postgres が生成する複合外部キー違反の生メッセージ（テーブル名・制約名などの
+      内部スキーマ情報を含む）がそのままクライアントへ返っていた。
+    </p>
+    <div class="doc-chunk">
+      <pre><code>create or replace function public.complete_shaken(...)
+...
+begin
+  if not exists (
+    select 1 from public.vehicles
+    where id = p_vehicle_id
+      and user_id = auth.uid()
+  ) then
+    raise exception 'vehicle not found or not owned by current user';
+  end if;
+
+  insert into public.maintenance_records (...) values (...) returning * into v_record;
+
+  update public.vehicles
+  set shaken_expiry_date = p_new_expiry_date
+  where id = p_vehicle_id
+    and user_id = auth.uid();
+
+  if not found then
+    raise exception 'vehicle not found or not owned by current user';
+  end if;
+
+  return v_record;
+end;
+$$;</code></pre>
+      <p>
+        <code>insert</code> より<strong>前</strong>に <code>select 1 from vehicles
+        where id = ... and user_id = auth.uid()</code> という明示的な所有権チェックを
+        追加した。他人の車両IDを渡した場合は、この時点で意図したエラーメッセージで
+        拒否されるため、複合外部キー違反という内部実装の詳細がクライアントに
+        漏れることがなくなる。
+      </p>
+      <p>
+        末尾の <code>update ... if not found</code> チェックはあえて残してある。
+        直前の <code>exists</code> チェックと <code>update</code> の間に
+        （理論上）対象車両が別トランザクションで削除される競合状態が起こりえるため、
+        その場合に備えた保険的な二重チェックとして機能する。
+      </p>
+      <p>
+        <code>security invoker</code>・権限（<code>revoke</code>/<code>grant</code>）・
+        関数シグネチャはいずれも変更していないため、再指定は不要
+        （<code>create or replace function</code> は既存の権限設定をそのまま維持する）。
+      </p>
+    </div>
+    <p>
+      このマイグレーションは開発用・本番用の両Supabaseプロジェクトへ、
+      これまでと同じ「SQL Editorへの手動貼り付け」方式で適用する必要がある
+      （<code>.claude/agent-memory/progress.md</code>の「判断の記録」参照）。
+    </p>
+
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-10 ／ 対象ファイル: supabase/migrations/20260907230000_create_set_updated_at_function.sql,
+    生成日: 2026-09-19（Phase 8で5.の修正を追記） ／ 対象ファイル: supabase/migrations/20260907230000_create_set_updated_at_function.sql,
     supabase/migrations/20260907230100_create_vehicles.sql,
     supabase/migrations/20260907230200_create_maintenance_records.sql,
-    supabase/migrations/20260907230300_create_complete_shaken_function.sql
+    supabase/migrations/20260907230300_create_complete_shaken_function.sql,
+    supabase/migrations/20260919220000_fix_complete_shaken_ownership_check.sql
   </footer>
 
 </div>

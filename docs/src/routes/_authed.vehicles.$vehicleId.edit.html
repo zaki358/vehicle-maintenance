@@ -62,7 +62,10 @@
     <div class="doc-chunk">
       <pre><code>async function handleSubmit(input: VehicleInput): Promise&lt;VehicleFormResult&gt; {
   try {
-    await updateVehicleFn({ data: { id: vehicle.id, ...input } })
+    const updated = await updateVehicleFn({ data: { id: vehicle.id, ...input } })
+    if (!updated) {
+      return { success: false, error: '更新に失敗しました。車両が見つかりませんでした。' }
+    }
     await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
     return { success: true }
   } catch {
@@ -76,12 +79,22 @@
         <code>id</code> を含めて検証する）に渡す点が異なります。
         成功したら新規登録と同じく、対象の車両の詳細ページへ戻ります。
       </p>
+      <p>
+        <strong>Phase 8のコードレビューで、<code>updateVehicleFn</code> が返す
+        <code>null</code>（<code>vehicles/server/update.ts</code> のコメントどおり、
+        「存在しない・他人の車両」を区別せず <code>null</code> を返す設計）を
+        ここで一切見ていないことが指摘され、修正しました。</strong>
+        修正前は <code>null</code> が返っても素通しで <code>navigate</code>
+        してしまい、実際には更新されていないのに「更新に成功した」という
+        画面遷移になっていました。<code>if (!updated)</code> で明示的に
+        失敗扱いにすることで、この食い違いを防いでいます。
+      </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.edit.tsx
+    生成日: 2026-09-19（Phase 8でnull戻り値のチェックを追加） ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.edit.tsx
   </footer>
 
 </div>

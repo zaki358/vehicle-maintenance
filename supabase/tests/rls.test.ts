@@ -104,6 +104,118 @@ describe('RLS: vehicles / maintenance_records', () => {
     expect(record).toBeNull()
   })
 
+  it('自分の整備記録のvehicle_idを他人の車両IDに書き換えられない(複合FK・UPDATE経由)', async () => {
+    const { data: aVehicle } = await userA.client
+      .from('vehicles')
+      .insert({ name: 'Aの車(UPDATE FKテスト用)', vehicle_type: 'car' })
+      .select()
+      .single()
+    const { data: bVehicle } = await userB.client
+      .from('vehicles')
+      .insert({ name: 'Bの車(UPDATE FKテスト用)', vehicle_type: 'car' })
+      .select()
+      .single()
+    const { data: record } = await userA.client
+      .from('maintenance_records')
+      .insert({ vehicle_id: aVehicle!.id, performed_on: '2026-01-01', work_type: 'engine_oil' })
+      .select()
+      .single()
+
+    const { data: updated, error } = await userA.client
+      .from('maintenance_records')
+      .update({ vehicle_id: bVehicle!.id })
+      .eq('id', record!.id)
+      .select()
+
+    // INSERT時と同じ複合FKがUPDATEでも効くため、Bの車両IDへの付け替えは拒否される。
+    expect(error).not.toBeNull()
+    expect(updated).toBeNull()
+  })
+
+  it('自分の整備記録のuser_idを他人に書き換えて譲渡できない(WITH CHECK)', async () => {
+    const { data: vehicle } = await userA.client
+      .from('vehicles')
+      .insert({ name: 'Aの車(記録譲渡テスト用)', vehicle_type: 'car' })
+      .select()
+      .single()
+    const { data: record } = await userA.client
+      .from('maintenance_records')
+      .insert({ vehicle_id: vehicle!.id, performed_on: '2026-01-01', work_type: 'tire' })
+      .select()
+      .single()
+
+    const { data: updated, error } = await userA.client
+      .from('maintenance_records')
+      .update({ user_id: userB.id })
+      .eq('id', record!.id)
+      .select()
+
+    // vehicles と同じ理由: using は自分の行なので通るが、更新後の行が
+    // 自分のものでなくなるため with check に弾かれてエラーになる。
+    expect(error).not.toBeNull()
+    expect(updated).toBeNull()
+
+    const { data: stillOwned } = await userA.client
+      .from('maintenance_records')
+      .select()
+      .eq('id', record!.id)
+      .single()
+    expect(stillOwned?.user_id).toBe(userA.id)
+  })
+
+  it('complete_shaken: 自分の車両なら整備記録の追加と満了日更新が1回のRPCで両方反映される', async () => {
+    const { data: vehicle } = await userA.client
+      .from('vehicles')
+      .insert({ name: 'Aの車(車検RPCテスト用)', vehicle_type: 'car', shaken_expiry_date: '2026-01-01' })
+      .select()
+      .single()
+
+    const { data: result, error } = await userA.client.rpc('complete_shaken', {
+      p_vehicle_id: vehicle!.id,
+      p_performed_on: '2026-01-01',
+      p_new_expiry_date: '2028-01-01',
+      p_odometer_km: 12345,
+    })
+
+    expect(error).toBeNull()
+    expect(result?.work_type).toBe('shaken')
+    expect(result?.vehicle_id).toBe(vehicle!.id)
+
+    const { data: updatedVehicle } = await userA.client
+      .from('vehicles')
+      .select('shaken_expiry_date')
+      .eq('id', vehicle!.id)
+      .single()
+    expect(updatedVehicle?.shaken_expiry_date).toBe('2028-01-01')
+  })
+
+  it('complete_shaken: 他人の車両IDを渡すと拒否され、記録も満了日もどちらも変化しない', async () => {
+    const { data: bVehicle } = await userB.client
+      .from('vehicles')
+      .insert({ name: 'Bの車(車検RPC拒否テスト用)', vehicle_type: 'car', shaken_expiry_date: '2026-01-01' })
+      .select()
+      .single()
+
+    const { data: result, error } = await userA.client.rpc('complete_shaken', {
+      p_vehicle_id: bVehicle!.id,
+      p_performed_on: '2026-01-01',
+      p_new_expiry_date: '2028-01-01',
+    })
+
+    expect(error).not.toBeNull()
+    expect(result).toBeNull()
+    // 2026-09-19のマイグレーション(insertより前に所有権チェックを追加)適用後は、
+    // 複合FK違反の生メッセージではなく、意図したメッセージで拒否されるはず。
+    expect(error?.message).toContain('vehicle not found or not owned by current user')
+
+    const { data: untouchedVehicle } = await userB.client
+      .from('vehicles')
+      .select('shaken_expiry_date')
+      .eq('id', bVehicle!.id)
+      .single()
+    expect(untouchedVehicle?.shaken_expiry_date).toBe('2026-01-01')
+  })
+
   it('未ログイン(anon)は両テーブルとも拒否される', async () => {
     const anon = createAnonClient()
 

@@ -36,6 +36,18 @@ describe('createSupabaseServerClient', () => {
     )
   })
 
+  it('cookieOptions.secure を true にして呼び出す（多層防御）', async () => {
+    const { createSupabaseServerClient } = await import('./server')
+
+    createSupabaseServerClient()
+
+    expect(createServerClientMock).toHaveBeenCalledWith(
+      'https://example.supabase.co',
+      'sb_publishable_xxxxx',
+      expect.objectContaining({ cookieOptions: expect.objectContaining({ secure: true }) }),
+    )
+  })
+
   it('呼び出すたびに新しいクライアントを作る（モジュールスコープでメモ化しない）', async () => {
     const { createSupabaseServerClient } = await import('./server')
 

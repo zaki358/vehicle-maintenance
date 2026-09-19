@@ -73,7 +73,10 @@ function EditRecordPage() {
 
   async function handleSubmit(input: RecordInput): Promise<RecordFormResult> {
     try {
-      await updateRecordFn({ data: { id: record.id, record: input } })
+      const updated = await updateRecordFn({ data: { id: record.id, record: input } })
+      if (!updated) {
+        return { success: false, error: '更新に失敗しました。整備記録が見つかりませんでした。' }
+      }
       await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
       return { success: true }
     } catch {

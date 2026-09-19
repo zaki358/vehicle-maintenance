@@ -47,12 +47,16 @@ function Dashboard() {
   const { user } = Route.useRouteContext()
   const { vehicles, records } = Route.useLoaderData()
   const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
 
   async function handleLogout() {
     setLoggingOut(true)
+    setLogoutError(null)
     try {
       await logoutFn()
       await navigate({ to: '/login', replace: true })
+    } catch {
+      setLogoutError('ログアウトに失敗しました。時間をおいて再度お試しください。')
     } finally {
       setLoggingOut(false)
     }
@@ -85,6 +89,7 @@ function Dashboard() {
       <button type="button" onClick={handleLogout} disabled={loggingOut}>
         ログアウト
       </button>
+      {logoutError && <p role="alert">{logoutError}</p>}
 
       <p>
         <Link to="/vehicles/new">＋ 車両を登録</Link>

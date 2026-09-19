@@ -3,13 +3,18 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-19(Phase 7 完了。ダッシュボード・車検アラートのブラウザ動作確認まで完了)
+最終更新: 2026-09-19(Phase 8 完了。本番デプロイ済み: https://vehicle-maintenance.y-kakeibo.workers.dev )
 
 ---
 
 ## 現在地
 
-**Phase 1〜7 完了。次はPhase 8(検証とデプロイ)。**
+**Phase 1〜8 完了。次はPhase 9(docsの全体解説ページ)。**
+Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正→Playwright E2E(8シナリオ×2プロジェクト
+=26テスト全成功)→`complete_shaken`修正マイグレーションを開発用・本番用の両方に適用確認済み→
+`wrangler login`確認→`npm run deploy`で本番デプロイ完了→未ログインアクセスでログイン画面が
+正しく表示されることを確認（コンソールエラーなし）。実際のアカウントでのフルログイン確認は
+依頼者に委ねた（使い捨てテストユーザーを本番で作りたくないため）。
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
@@ -443,38 +448,83 @@
   満たせなかった。中身は次回Phase 7で丸ごと置き換える前提の最小限の実装（メールアドレス表示＋
   ログアウトボタンのみ）
 
----
+### Phase 8（検証とデプロイ）— レビュー・E2E・修正まで完了。デプロイのみ未着手
+
+- [x] **`code-reviewer`/`security-reviewer`/`database-reviewer`の3エージェントを並列実行**
+      （初めての全体レビュー。差分だけでなくコードベース全体を対象にした）。
+      見つかった指摘: コードHIGH1件・Medium3件・Low2件、セキュリティMedium/High1件・Medium1件・Low2件、
+      DBはテストギャップ4件（実装自体は健全）
+- [x] **Playwright E2E一式を新規構築**（`e2e-runner`エージェント経由。レート制限で一度中断し
+      `SendMessage`で再開）。`playwright.config.ts`＋`e2e/support/*`＋`e2e/tests/*.spec.ts`（8ファイル）。
+      `mobile`（Pixel 5）/`desktop`（1280×800）の2プロジェクトで8シナリオ全て（26テスト）成功。
+      調査の過程で「TanStack Startのフレームワーク側の不具合では」と一時疑われたが、
+      最終的にはテスト側の2つの問題（ハイドレーション待ち不足・`getByLabel`のexact一致が
+      `<select>`では効かない）に起因すると判明し、アプリ本体の修正は不要だった。
+      副次的に、テストユーザーのロールバック漏れで開発用Supabaseにゴミユーザー12件が残留する
+      不具合も見つけて修正・削除済み。解説ドキュメント`docs/e2e.html`を新規作成
+- [x] **レビュー指摘のうちHIGH+Medium全てを修正**（依頼者の指示で対応範囲を確定）:
+  - `src/lib/url/safe-redirect.ts`（新規）— ログイン後リダイレクトのオープンリダイレクト対策
+    （`isSafeRedirectPath`。`/login?redirect=`に絶対URLを許容していた脆弱性）。TDDで実装。
+    `docs/src/lib/url/safe-redirect.html`新規作成
+  - `src/integrations/supabase/server.ts` — `cookieOptions: { secure: true }`を追加
+    （`httpOnly: false`は意図どおり維持、`secure`だけ多層防御として追加）
+  - `src/lib/date/format-ja.ts` — **date-fns依存を完全に除去**し、`getUTCFullYear()`等の
+    UTCゲッターだけで実装し直した。旧実装（`date-fns`の`format()`）は実行環境のローカル
+    タイムゾーンに依存するバグを抱えていた（西経タイムゾーンで前日にずれる）。
+    日本国内の開発機・TZ=UTCのCloudflare Workersでは顕在化しないため気づかれていなかった
+  - `_authed.index.tsx`／`_authed.vehicles.$vehicleId.index.tsx` — ログアウト・車両削除・
+    整備記録削除の`catch`欠落（エラー握りつぶし）を修正。他のフォームと同じ
+    エラー表示パターンに統一
+  - `_authed.vehicles.$vehicleId.edit.tsx`／`.records.$recordId.edit.tsx` — `updateVehicleFn`/
+    `updateRecordFn`が返す`null`（RLSブロック・削除済み等）を無視していたのを修正
+  - `supabase/migrations/20260919220000_fix_complete_shaken_ownership_check.sql`（新規）—
+    `complete_shaken`の所有権チェックを`insert`より前に移動。旧実装は他人の車両IDを渡すと
+    複合FK違反の生エラーメッセージがクライアントに漏れていた（実害は限定的だがスキーマ情報の漏洩）。
+    **依頼者が開発用・本番用の両SupabaseプロジェクトへSQL Editor手動貼り付けで適用済み**
+  - `supabase/tests/rls.test.ts` — DBレビューで指摘されたテストギャップ4件を追加
+    （maintenance_recordsのUPDATE WITH CHECK、複合FK経由のUPDATE防止、complete_shaken RPCの
+    正常系/異常系）。マイグレーション適用後の`complete_shaken`異常系テストに、意図した
+    エラーメッセージ（`'vehicle not found or not owned by current user'`）であることの
+    アサーションを追加し、開発用プロジェクトに対して9件全て成功することでマイグレーション適用を確認済み
+  - 関連するdocs/*.htmlを全て更新・新規作成済み（`login.html`/`server.html`/`format-ja.html`/
+    `_authed.index.html`/`_authed.vehicles.$vehicleId.index.html`/`.edit.html`/
+    `.records.$recordId.edit.html`/`migrations.html`/`tests/rls.html`）
+- [x] **修正後、lint/typecheck/test:coverage(294テスト)/build/test:rls(9テスト)/test:e2e(26テスト)
+      全てgreenを再確認**
+- [x] **`complete_shaken`修正マイグレーションを開発用・本番用Supabaseへ適用**（依頼者がSQL Editorへ
+      手動貼り付け。開発用プロジェクトはテストで適用確認済み）
+- [x] **`wrangler login`完了確認**（`npx wrangler whoami`で認証済みアカウント
+      `t.yamazaki.1129@gmail.com`を確認）
+- [x] **`npm run deploy`で本番デプロイ完了** — https://vehicle-maintenance.y-kakeibo.workers.dev
+      未ログインアクセスでログイン画面が正しく表示されること、コンソールエラーが無いことを確認済み。
+      **実際のアカウントでのフルログイン確認は依頼者に委ねた**（本番で使い捨てテストユーザーを
+      作りたくないため）
+- [ ] 見送った指摘（依頼者の判断で今回はスコープ外）: enum文字列の型キャスト重複（Low）、
+      フォームの`initialValues`に`key`未指定（Low）、DB由来の生エラーメッセージが一般的に
+      漏れる問題（Low、`complete_shaken`以外の全サーバー関数）、`npm audit`のsharp経由
+      devDependency脆弱性4件（wrangler/miniflare経由、本番バンドル非対象）、
+      `date-fns`パッケージ自体が今や未使用（`format-ja.ts`からの依存除去後。package.jsonからの
+      削除は未実施 — 依頼者に確認してから`npm uninstall`すること）
 
 ## 次にやること
 
-**Phase 7（ダッシュボードと車検アラート）— 完了。**
+**Phase 8 完了（デプロイ済み）。**
 
-- ~~`features/shaken/lib/complete-shaken-schema.ts`~~ — **完成済み**
-- ~~`features/maintenance/server/list-all.ts`~~ — **完成済み**
-- ~~`features/shaken/server/complete-shaken.ts`（RPC呼び出し）~~ — **完成済み**
-- ~~`features/shaken/complete-shaken-form.tsx`~~ — **完成済み**
-- ~~`_authed.vehicles.$vehicleId.shaken.tsx`（新規ルート）~~ — **完成済み**
-- ~~`_authed.vehicles.$vehicleId.index.tsx`に車検アラート表示を統合~~ — **完成済み**
-- ~~`_authed.index.tsx`をダッシュボード本実装に置き換え~~ — **完成済み**
-- ~~ブラウザでの動作確認~~ — **完成済み**（車検アラート表示・車検完了RPC・ダッシュボード反映・
-  車検対象外車両でUI非表示、の一連を確認済み）
+- 依頼者が実際のアカウントでの本番ログインを確認する（未実施）
+- 今回の一連の変更（未コミット）をコミットするかどうか依頼者に確認する
 
-**次は Phase 8（検証とデプロイ）に着手する**:
-Playwright E2E（モバイル＋デスクトップ、`e2e-runner`エージェント経由。実装プランの
-「検証方法 > E2E」に優先順位付きのシナリオ一覧あり）、`code-reviewer`/`security-reviewer`
-によるレビュー、`wrangler deploy`（依頼者の`wrangler login`が前提。まだ未実施）。
-実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
-先に読み直してから着手すること。Phase 9（docsのHTML解説ページ）は個別ファイルの解説は
-各フェーズで既に作成済みなので、残るのは「プロジェクト全体解説ページ」（CLAUDE.mdのルール4）。
+**Phase 9（docsの全体解説ページ）** に進む: 個別ファイルの解説は各フェーズで既に作成済みなので、
+残るのは「プロジェクト全体解説ページ」（CLAUDE.mdのルール4: 概要・機能・使用ツール・
+フォルダ構成・各ファイルの役割をまとめたページ）。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 288 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 294 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-**中断時点**: Phase 7 完了。Phase 8（検証とデプロイ）に未着手。
-未コミットの変更があるので、コミットするかどうか依頼者に確認する
-（`.claude/launch.json`にポート競合対応で追加した`vehicle-maintenance-dev-alt`設定を含む）。
+**中断時点**: Phase 8 完了・本番デプロイ済み（https://vehicle-maintenance.y-kakeibo.workers.dev ）。
+未コミットの変更多数あり、コミットするかどうか依頼者に確認する。次はPhase 9
+（docsの全体解説ページ）に着手する。
 
 ---
 
@@ -554,5 +604,5 @@ Playwright E2E（モバイル＋デスクトップ、`e2e-runner`エージェン
 - [x] Phase 5 — 車両 CRUD（server 5本 + vehicle-form + ルート5本。ブラウザで動作確認済み）
 - [x] Phase 6 — 整備記録 CRUD（server 5本 + record-form + ルート3本。ブラウザで動作確認済み）
 - [x] Phase 7 — ダッシュボードと車検アラート（complete-shaken RPC + ダッシュボード/車検UI。ブラウザで動作確認済み）
-- [ ] Phase 8 — 検証（E2E / レビュー）とデプロイ
+- [x] Phase 8 — 検証（E2E / レビュー）とデプロイ（レビュー✅ / E2E✅ / 指摘修正✅ / マイグレーション適用✅ / デプロイ✅）
 - [ ] Phase 9 — docs の HTML 解説ページ（各ファイル解説は各フェーズで作成済み。残るのはプロジェクト全体解説ページ）

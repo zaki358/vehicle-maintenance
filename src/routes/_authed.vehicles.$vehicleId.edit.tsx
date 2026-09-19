@@ -24,7 +24,10 @@ function EditVehiclePage() {
 
   async function handleSubmit(input: VehicleInput): Promise<VehicleFormResult> {
     try {
-      await updateVehicleFn({ data: { id: vehicle.id, ...input } })
+      const updated = await updateVehicleFn({ data: { id: vehicle.id, ...input } })
+      if (!updated) {
+        return { success: false, error: '更新に失敗しました。車両が見つかりませんでした。' }
+      }
       await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
       return { success: true }
     } catch {

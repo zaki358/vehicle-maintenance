@@ -106,10 +106,34 @@
       </p>
     </div>
 
+    <div class="doc-chunk">
+      <pre><code>async function handleSubmit(input: RecordInput): Promise&lt;RecordFormResult&gt; {
+  try {
+    const updated = await updateRecordFn({ data: { id: record.id, record: input } })
+    if (!updated) {
+      return { success: false, error: '更新に失敗しました。整備記録が見つかりませんでした。' }
+    }
+    await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
+    return { success: true }
+  } catch {
+    return { success: false, error: '更新に失敗しました。時間をおいて再度お試しください。' }
+  }
+}</code></pre>
+      <p>
+        <strong>Phase 8のコードレビューで、<code>updateRecordFn</code> が返す
+        <code>null</code>（<code>maintenance/server/update.ts</code> の設計どおり、
+        「存在しない・他人の記録」を区別せず <code>null</code> を返す）を
+        ここで無視していたことが指摘され、<code>vehicles/$vehicleId/edit.tsx</code>
+        と同じ形で修正しました。</strong>
+        <code>null</code> が返ってきた場合は失敗として扱い、成功したときだけ
+        車両詳細ページへ戻ります。
+      </p>
+    </div>
+
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.tsx
+    生成日: 2026-09-19（Phase 8でnull戻り値のチェックを追加） ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.tsx
   </footer>
 
 </div>

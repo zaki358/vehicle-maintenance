@@ -5,9 +5,15 @@ import { z } from 'zod'
 
 import { loginSchema } from '@/features/auth/lib/login-schema'
 import { loginFn } from '@/features/auth/server/login'
+import { isSafeRedirectPath } from '@/lib/url/safe-redirect'
 
 const loginSearchSchema = z.object({
-  redirect: z.string().optional(),
+  // 絶対URLやプロトコル相対URLが混入した場合はオープンリダイレクトになるため、
+  // 安全な相対パスでなければ既定の遷移先（'/'）にフォールバックさせる。
+  redirect: z
+    .string()
+    .transform((value) => (isSafeRedirectPath(value) ? value : undefined))
+    .optional(),
 })
 
 export const Route = createFileRoute('/login')({

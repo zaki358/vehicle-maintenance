@@ -22,12 +22,23 @@
       2 種類を提供します。
     </p>
     <p>
-      <code>lib/date</code> ディレクトリの中で<strong>唯一 <code>date-fns</code> を使ってよいファイル</strong>です。
-      他のファイル（<code>date-string.ts</code>、<code>add-months.ts</code>）は
-      Cloudflare Workers（UTC）と利用者の端末（JST）のタイムゾーン差を避けるため、
-      意図的に <code>Date</code> オブジェクトを使わず文字列と整数だけで計算しています。
-      このファイルがやっているのは日付の「計算」ではなく「表示への変換」であり、
-      曜日名を求めるには標準ライブラリの厚みが要るため、ここだけ例外的に <code>date-fns</code> を使います。
+      <strong>Phase 8のコードレビューで、以前このファイルが使っていた
+      <code>date-fns</code> の <code>format()</code> がタイムゾーン依存のバグを
+      抱えていることが判明し、修正しました。</strong>
+      <code>format()</code> は <code>Date</code> オブジェクトから
+      <strong>実行環境のローカルタイムゾーンの</strong>年月日・曜日を読み取ります。
+      西経のタイムゾーン（例: アメリカのCIランナー）でこの関数を実行すると、
+      UTC深夜0時として解釈された日付が「前日」にずれて表示されるおそれがありました
+      （日本国内の開発機や、TZ=UTCのCloudflare Workers上ではズレが顕在化しないため、
+      これまで気づかれていませんでした）。
+    </p>
+    <p>
+      修正後は <code>date-fns</code> を使わず、<code>Date</code> の
+      <code>getUTCFullYear()</code> / <code>getUTCMonth()</code> /
+      <code>getUTCDate()</code> / <code>getUTCDay()</code> という
+      <strong>UTC 版のゲッターだけ</strong>で年月日・曜日を取り出します。
+      これらは実行環境のタイムゾーン設定に一切左右されないため、
+      どの環境で実行しても入力した日付文字列どおりの結果になります。
     </p>
     <p>
       <strong>このファイルの関数を計算に使ってはいけません。</strong>
@@ -42,6 +53,8 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
+        <tr><td><code>WEEKDAY_JA</code></td><td>const</td><td>曜日番号（0=日〜6=土）を日本語1文字に対応させる配列</td></tr>
+        <tr><td><code>toUtcParts</code></td><td>function</td><td><code>DateString</code> をUTC基準の年・月・日・曜日に分解する内部ヘルパー</td></tr>
         <tr><td><code>formatJa</code></td><td>function（export）</td><td>「2026年9月6日(日)」形式。満了日など、しっかり読ませたい場面用</td></tr>
         <tr><td><code>formatJaShort</code></td><td>function（export）</td><td>「9/6」形式。記録一覧など、日付を何行も並べる場面用</td></tr>
       </tbody>
@@ -52,33 +65,55 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>export function formatJa(date: DateString): string {
-  return format(parseISO(date), 'yyyy年M月d日(E)', { locale: ja })
+      <pre><code>const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const
+
+function toUtcParts(date: DateString) {
+  const parsed = new Date(`${date}T00:00:00.000Z`)
+  return {
+    year: parsed.getUTCFullYear(),
+    month: parsed.getUTCMonth() + 1,
+    day: parsed.getUTCDate(),
+    weekday: WEEKDAY_JA[parsed.getUTCDay()],
+  }
 }</code></pre>
       <p>
-        <code>parseISO</code> で <code>DateString</code>（<code>"2026-09-06"</code> の形式）を
-        <code>Date</code> オブジェクトに変換し、<code>date-fns</code> の <code>format</code> で
-        日本語の書式に整形します。書式指定子 <code>'yyyy年M月d日(E)'</code> の
-        <code>M</code>・<code>d</code>（大文字小文字を区別）はゼロ埋めしない月・日を意味し、
-        <code>(E)</code> が曜日（日本語ロケールなら「日」「月」など1文字）に対応します。
+        <code>DateString</code>（<code>"2026-09-06"</code> の形式）の末尾に
+        明示的に <code>T00:00:00.000Z</code> を付けて <code>Date</code> を作ることで、
+        「UTC深夜0時」という解釈を曖昧さなく固定します。そこから
+        <code>getUTCFullYear()</code>・<code>getUTCMonth()</code>（0始まりなので+1する）・
+        <code>getUTCDate()</code>・<code>getUTCDay()</code>（0=日曜〜6=土曜）という
+        <strong>すべて "UTC" が付くゲッター</strong>だけを使ってフィールドを取り出します。
+        通常版の <code>getFullYear()</code> 等（ローカルタイムゾーン版）を
+        1つでも混ぜると、実行環境によって日付が前後にずれるバグが再発するため、
+        ここが最も注意すべき箇所です。
       </p>
       <p>
-        <strong>なぜ「計算」ではなく「変換」だから安全なのか。</strong>
-        <code>YYYY-MM-DD</code> のような日付のみの文字列を <code>parseISO</code>（内部的には
-        <code>Date</code> のコンストラクタと同様の解釈）に渡すと、
-        <strong>UTC の深夜0時</strong>として解釈されます。ここから
-        <code>format</code> が年・月・日・曜日を取り出す際も一貫して UTC 基準の値を読むため、
-        実行環境（Workers の UTC でも開発機の JST でも）に関わらず、
-        入力した日付文字列どおりの年月日・曜日が得られます。
-        タイムゾーンのズレが問題になるのは「今この瞬間が何月何日か」を求める場面
-        （<code>jst.ts</code> の役割）であって、「すでに確定した日付文字列を人間向けに書き直す」
-        だけのこの関数には影響しません。
+        曜日は <code>Intl</code> や <code>date-fns</code> のロケール機能に頼らず、
+        <code>WEEKDAY_JA</code> という固定配列への添字アクセスだけで求めています。
+        日本語の曜日は7つしかないので、この程度なら自前配列の方が
+        依存も増えずシンプルです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function formatJa(date: DateString): string {
+  const { year, month, day, weekday } = toUtcParts(date)
+  return `${year}年${month}月${day}日(${weekday})`
+}</code></pre>
+      <p>
+        <code>toUtcParts</code> で取り出した値をそのままテンプレートリテラルに
+        埋め込むだけです。<code>month</code>・<code>day</code> はゼロ埋めしない
+        （日本語表記の慣習どおり「9月6日」であって「09月06日」ではない）ため、
+        ゼロ埋めしないよう気をつける必要はもうありません
+        （<code>getUTCMonth()+1</code>・<code>getUTCDate()</code> は
+        そもそもゼロ埋めされた文字列を返さない数値なので、自然にそうなります）。
       </p>
     </div>
 
     <div class="doc-chunk">
       <pre><code>export function formatJaShort(date: DateString): string {
-  return format(parseISO(date), 'M/d')
+  const { month, day } = toUtcParts(date)
+  return `${month}/${day}`
 }</code></pre>
       <p>
         整備記録の一覧のように、日付を何行も縦に並べる画面では
@@ -90,7 +125,7 @@
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-06 ／ 対象ファイル: src/lib/date/format-ja.ts
+    生成日: 2026-09-19（Phase 8で date-fns 依存を除去し全面改稿） ／ 対象ファイル: src/lib/date/format-ja.ts
   </footer>
 
 </div>
