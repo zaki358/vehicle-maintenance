@@ -18,6 +18,8 @@ import { Route as AuthedVehiclesVehicleIdRouteImport } from './routes/_authed.ve
 import { Route as AuthedVehiclesNewRouteImport } from './routes/_authed.vehicles.new'
 import { Route as AuthedVehiclesVehicleIdIndexRouteImport } from './routes/_authed.vehicles.$vehicleId.index'
 import { Route as AuthedVehiclesVehicleIdEditRouteImport } from './routes/_authed.vehicles.$vehicleId.edit'
+import { Route as AuthedVehiclesVehicleIdRecordsNewRouteImport } from './routes/_authed.vehicles.$vehicleId.records.new'
+import { Route as AuthedVehiclesVehicleIdRecordsRecordIdEditRouteImport } from './routes/_authed.vehicles.$vehicleId.records.$recordId.edit'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -65,6 +67,18 @@ const AuthedVehiclesVehicleIdEditRoute =
     path: '/edit',
     getParentRoute: () => AuthedVehiclesVehicleIdRoute,
   } as any)
+const AuthedVehiclesVehicleIdRecordsNewRoute =
+  AuthedVehiclesVehicleIdRecordsNewRouteImport.update({
+    id: '/records/new',
+    path: '/records/new',
+    getParentRoute: () => AuthedVehiclesVehicleIdRoute,
+  } as any)
+const AuthedVehiclesVehicleIdRecordsRecordIdEditRoute =
+  AuthedVehiclesVehicleIdRecordsRecordIdEditRouteImport.update({
+    id: '/records/$recordId/edit',
+    path: '/records/$recordId/edit',
+    getParentRoute: () => AuthedVehiclesVehicleIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -75,6 +89,8 @@ export interface FileRoutesByFullPath {
   '/vehicles/': typeof AuthedVehiclesIndexRoute
   '/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
   '/vehicles/$vehicleId/': typeof AuthedVehiclesVehicleIdIndexRoute
+  '/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
+  '/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -84,6 +100,8 @@ export interface FileRoutesByTo {
   '/vehicles': typeof AuthedVehiclesIndexRoute
   '/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
   '/vehicles/$vehicleId': typeof AuthedVehiclesVehicleIdIndexRoute
+  '/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
+  '/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,6 +114,8 @@ export interface FileRoutesById {
   '/_authed/vehicles/': typeof AuthedVehiclesIndexRoute
   '/_authed/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
   '/_authed/vehicles/$vehicleId/': typeof AuthedVehiclesVehicleIdIndexRoute
+  '/_authed/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
+  '/_authed/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,6 +128,8 @@ export interface FileRouteTypes {
     | '/vehicles/'
     | '/vehicles/$vehicleId/edit'
     | '/vehicles/$vehicleId/'
+    | '/vehicles/$vehicleId/records/new'
+    | '/vehicles/$vehicleId/records/$recordId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -117,6 +139,8 @@ export interface FileRouteTypes {
     | '/vehicles'
     | '/vehicles/$vehicleId/edit'
     | '/vehicles/$vehicleId'
+    | '/vehicles/$vehicleId/records/new'
+    | '/vehicles/$vehicleId/records/$recordId/edit'
   id:
     | '__root__'
     | '/_authed'
@@ -128,6 +152,8 @@ export interface FileRouteTypes {
     | '/_authed/vehicles/'
     | '/_authed/vehicles/$vehicleId/edit'
     | '/_authed/vehicles/$vehicleId/'
+    | '/_authed/vehicles/$vehicleId/records/new'
+    | '/_authed/vehicles/$vehicleId/records/$recordId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,18 +227,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedVehiclesVehicleIdEditRouteImport
       parentRoute: typeof AuthedVehiclesVehicleIdRoute
     }
+    '/_authed/vehicles/$vehicleId/records/new': {
+      id: '/_authed/vehicles/$vehicleId/records/new'
+      path: '/records/new'
+      fullPath: '/vehicles/$vehicleId/records/new'
+      preLoaderRoute: typeof AuthedVehiclesVehicleIdRecordsNewRouteImport
+      parentRoute: typeof AuthedVehiclesVehicleIdRoute
+    }
+    '/_authed/vehicles/$vehicleId/records/$recordId/edit': {
+      id: '/_authed/vehicles/$vehicleId/records/$recordId/edit'
+      path: '/records/$recordId/edit'
+      fullPath: '/vehicles/$vehicleId/records/$recordId/edit'
+      preLoaderRoute: typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRouteImport
+      parentRoute: typeof AuthedVehiclesVehicleIdRoute
+    }
   }
 }
 
 interface AuthedVehiclesVehicleIdRouteChildren {
   AuthedVehiclesVehicleIdEditRoute: typeof AuthedVehiclesVehicleIdEditRoute
   AuthedVehiclesVehicleIdIndexRoute: typeof AuthedVehiclesVehicleIdIndexRoute
+  AuthedVehiclesVehicleIdRecordsNewRoute: typeof AuthedVehiclesVehicleIdRecordsNewRoute
+  AuthedVehiclesVehicleIdRecordsRecordIdEditRoute: typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
 }
 
 const AuthedVehiclesVehicleIdRouteChildren: AuthedVehiclesVehicleIdRouteChildren =
   {
     AuthedVehiclesVehicleIdEditRoute: AuthedVehiclesVehicleIdEditRoute,
     AuthedVehiclesVehicleIdIndexRoute: AuthedVehiclesVehicleIdIndexRoute,
+    AuthedVehiclesVehicleIdRecordsNewRoute:
+      AuthedVehiclesVehicleIdRecordsNewRoute,
+    AuthedVehiclesVehicleIdRecordsRecordIdEditRoute:
+      AuthedVehiclesVehicleIdRecordsRecordIdEditRoute,
   }
 
 const AuthedVehiclesVehicleIdRouteWithChildren =

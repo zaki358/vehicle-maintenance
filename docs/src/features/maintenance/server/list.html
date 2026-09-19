@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>list.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>list.ts</h1>
+    <div class="doc-path">src/features/maintenance/server/list.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      指定した車両の整備記録一覧を、実施日の新しい順で取得するサーバー関数です。
+      車両詳細ページ（<code>_authed.vehicles.$vehicleId.index.tsx</code>）と
+      整備記録の新規登録・編集ページの両方が、走行距離の逆行チェックや
+      作業内容フィルタの元データとしてこれを呼びます。
+    </p>
+    <p>
+      Phase 5 の <code>vehicles/server/list.ts</code> と同じ設計方針を踏襲しています:
+      <code>xxxHandler</code>（deps 注入・純粋・テスト容易）と、それを
+      <code>createServerFn().handler()</code> で包む <code>xxxFn</code>（実HTTPエンドポイント）
+      の2段構成です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>MaintenanceRecordRow</code></td><td>type（export）</td><td><code>maintenance_records</code> テーブルの行型（<code>database.types.ts</code> から）</td></tr>
+        <tr><td><code>ListRecordsDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
+        <tr><td><code>listRecordsHandler</code></td><td>async function（export）</td><td>指定車両の整備記録一覧をDBから取得する純粋なハンドラ</td></tr>
+        <tr><td><code>listRecordsFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type MaintenanceRecordRow = Tables&lt;'maintenance_records'&gt;
+
+interface ListRecordsDeps {
+  supabase: Pick&lt;SupabaseClient&lt;Database&gt;, 'from'&gt;
+}</code></pre>
+      <p>
+        戻り値の型は DB の行そのもの（スネークケース）です。<code>vehicles/server/list.ts</code>
+        と同じく、キャメルケースへの変換はここでは行わず、呼び出し側（ルート）で
+        必要な場面だけ個別に変換します。<code>deps.supabase</code> を
+        <code>Pick&lt;..., 'from'&gt;</code> に絞っているのは、テストで
+        <code>vi.fn()</code> の素のオブジェクトを型キャストなしで渡せるようにするためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function listRecordsHandler(
+  input: VehicleScopeInput,
+  deps: ListRecordsDeps,
+): Promise&lt;MaintenanceRecordRow[]&gt; {
+  const { data, error } = await deps.supabase
+    .from('maintenance_records')
+    .select('*')
+    .eq('vehicle_id', input.vehicleId)
+    .order('performed_on', { ascending: false })
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>user_id</code> での絞り込みをこの関数側で書かないのは意図的です。
+        RLS の <code>maintenance_records_select_own</code> ポリシーが既に
+        <code>auth.uid() = user_id</code> を強制しており、二重に書くと
+        「ポリシーが正しく機能しているか」をアプリコードのフィルタが隠してしまいます
+        （<code>vehicles/server/list.ts</code> と同じ考え方）。
+        また、複合外部キー <code>(vehicle_id, user_id)</code> により
+        <code>vehicle_id</code> は必ず自分の車両を指すため、<code>vehicleId</code>
+        だけの絞り込みで他人の記録が混ざる余地はありません。
+        並び順は「新しい順」を既定にし、一覧表示でそのまま使える形にしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const listRecordsFn = createServerFn({ method: 'GET' })
+  .validator(vehicleScopeSchema)
+  .handler(({ data }) => listRecordsHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        <code>createSupabaseServerClient()</code> の呼び出しを
+        <code>.handler()</code> コールバックの中だけに置いているのは、
+        Phase 4 で判明した「デフォルト引数にすると import-protection エラーで
+        ビルドが失敗する」問題を避けるためです（詳細は進捗記録の「判断の記録」参照）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/list.ts
+  </footer>
+
+</div>
+</body>
+</html>

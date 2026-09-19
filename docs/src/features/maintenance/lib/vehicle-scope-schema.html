@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vehicle-scope-schema.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>vehicle-scope-schema.ts</h1>
+    <div class="doc-path">src/features/maintenance/lib/vehicle-scope-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      「どの車両に属する整備記録を扱うか」という <code>vehicleId</code> 1個だけを
+      検証する、Phase 5 の <code>vehicle-id-schema.ts</code> と同型の小さな Zod スキーマです。
+      整備記録は必ずどこかの車両に属するため、一覧取得・部品サジェスト取得の
+      入口でこの ID を検証します。
+    </p>
+    <p>
+      Phase 6 で新設した <code>server/create.ts</code> では、このスキーマを
+      <code>.extend({ record: recordSchema })</code> という形で整備記録本体のスキーマと
+      合成しています。<code>recordSchema</code> は <code>.refine()</code> で作られた
+      ZodEffects のため <code>.shape</code> を持たず、直接 <code>.extend()</code> できません
+      （Phase 5 の <code>vehicleIdSchema.extend(vehicleSchema.shape)</code> とは対称的な制約）。
+      合成対象を <code>record</code> というネストしたフィールドとして持たせることで、
+      内側のスキーマの形を問わず合成できるようにしています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>vehicleScopeSchema</code></td><td>const（export）</td><td><code>{ vehicleId: string }</code> が UUID 形式であることを検証するスキーマ</td></tr>
+        <tr><td><code>VehicleScopeInput</code></td><td>type（export）</td><td><code>vehicleScopeSchema</code> から推論した入力の型</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const vehicleScopeSchema = z.object({
+  vehicleId: z.uuid('車両IDの形式が正しくありません'),
+})</code></pre>
+      <p>
+        フィールド名を <code>id</code>（vehicles/lib/vehicle-id-schema.ts）ではなく
+        <code>vehicleId</code> にしているのは、<code>server/update.ts</code> の
+        <code>recordIdSchema</code>（整備記録自身の <code>id</code>）と後で合成したときに
+        フィールド名が衝突しないようにするためです。<code>server/create.ts</code> では
+        <code>vehicleId</code> と <code>record</code>（整備記録本体）が同居し、
+        <code>server/update.ts</code> では記録自身の <code>id</code> と <code>record</code>
+        が同居しますが、両者を混同する余地がありません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export type VehicleScopeInput = z.infer&lt;typeof vehicleScopeSchema&gt;</code></pre>
+      <p>
+        <code>server/list.ts</code> と <code>server/list-part-details.ts</code> の
+        ハンドラ関数の引数の型としてそのまま使われます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/lib/vehicle-scope-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>

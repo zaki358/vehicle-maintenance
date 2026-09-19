@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.$vehicleId.records.new.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.$vehicleId.records.new.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.$vehicleId.records.new.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の新規登録ページです（URL: <code>/vehicles/$vehicleId/records/new</code>）。
+      <code>RecordForm</code> を「登録」モードで表示し、部品/型式のサジェスト候補と
+      走行距離の逆行チェック用データを、ページ表示前に取得しておきます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>新規登録ページのルート定義。<code>loader</code>で記録一覧と部品候補を並行取得</td></tr>
+        <tr><td><code>NewRecordPage</code></td><td>function（component）</td><td>フォーム表示と登録処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>loader: async ({ params }) =&gt; {
+  const [records, partDetails] = await Promise.all([
+    listRecordsFn({ data: { vehicleId: params.vehicleId } }),
+    listPartDetailsFn({ data: { vehicleId: params.vehicleId } }),
+  ])
+  return { records, partDetails }
+}</code></pre>
+      <p>
+        「走行距離の逆行チェック用に全記録が要る」ことと「部品/型式のサジェストが要る」
+        ことは互いに独立したデータ取得なので、<code>Promise.all</code> で
+        同時に投げてページ表示までの待ち時間を短くしています。
+        どちらも同じ <code>vehicleId</code> スコープのクエリです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const partSuggestionsList = partSuggestions(partDetails.map((row) =&gt; ({ partDetail: row.part_detail })))
+const existingReadings: OdometerReading[] = records
+  .filter((record) =&gt; record.odometer_km !== null)
+  .map((record) =&gt; ({ performedOn: toDateString(record.performed_on), odometerKm: record.odometer_km as number }))</code></pre>
+      <p>
+        Phase 3 で作った2つの純粋関数（<code>part-suggestions.ts</code>・
+        <code>odometer.ts</code>）に、DBの生データを適切な形に変換してから渡します。
+        <code>existingReadings</code> は走行距離が記録されている行だけに絞り込みます
+        （<code>odometer_km</code> が <code>null</code> の記録と比較しても
+        「逆行しているか」を判定できないため）。新規登録なので、
+        自分自身を除外する必要はありません（まだ存在しないため）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>async function handleSubmit(input: RecordInput): Promise&lt;RecordFormResult&gt; {
+  try {
+    await createRecordFn({ data: { vehicleId: vehicle.id, record: input } })
+    await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
+    return { success: true }
+  } catch {
+    return { success: false, error: '登録に失敗しました。時間をおいて再度お試しください。' }
+  }
+}</code></pre>
+      <p>
+        <code>vehicles/new.tsx</code> と同じ形です。<code>RecordForm</code> が
+        <code>recordSchema</code> で検証済みの <code>RecordInput</code> を渡してくるので、
+        ここでは <code>vehicleId</code> を足して <code>createRecordFn</code> に渡すだけです。
+        成功したら車両詳細ページ（整備記録一覧）へ戻ります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.records.new.tsx
+  </footer>
+
+</div>
+</body>
+</html>

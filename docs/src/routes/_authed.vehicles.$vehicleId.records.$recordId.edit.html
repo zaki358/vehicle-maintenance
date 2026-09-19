@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.$vehicleId.records.$recordId.edit.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.$vehicleId.records.$recordId.edit.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の編集ページです
+      （URL: <code>/vehicles/$vehicleId/records/$recordId/edit</code>）。
+      対象の記録を <code>loader</code> で特定し、見つからなければ
+      <code>_authed.vehicles.$vehicleId.tsx</code>（車両詳細）と同じ考え方で
+      <code>notFound()</code> を返します。
+    </p>
+    <p>
+      実装プランに列挙されたサーバー関数は <code>list/create/update/delete/
+      list-part-details</code> の5本で、記録1件だけを取得する専用関数
+      （<code>get.ts</code> 相当）は含まれていません。このページは代わりに
+      車両スコープの一覧（<code>listRecordsFn</code>）を取得し、
+      対象IDをこのファイル内で絞り込みます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>編集ページのルート定義。対象記録が見つからなければ <code>notFound()</code></td></tr>
+        <tr><td><code>RecordNotFound</code></td><td>function（component）</td><td>記録が見つからない場合の専用画面</td></tr>
+        <tr><td><code>EditRecordPage</code></td><td>function（component）</td><td>フォーム表示と更新処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>loader: async ({ params }) =&gt; {
+  const [records, partDetails] = await Promise.all([
+    listRecordsFn({ data: { vehicleId: params.vehicleId } }),
+    listPartDetailsFn({ data: { vehicleId: params.vehicleId } }),
+  ])
+  const record = records.find((candidate) =&gt; candidate.id === params.recordId)
+  if (!record) {
+    throw notFound()
+  }
+  return { record, records, partDetails }
+}</code></pre>
+      <p>
+        <code>listRecordsFn</code> は指定した <code>vehicleId</code>（かつRLSにより
+        自分の車両）の記録しか返さないため、「他の車両の記録ID」や
+        「他人の記録ID」を <code>$recordId</code> に直接指定してURLへ来ても、
+        一覧の中に見つからず自然に <code>notFound()</code> になります。
+        存在しないIDと閲覧権限がないIDを区別しないのは、車両詳細ページの
+        <code>_authed.vehicles.$vehicleId.tsx</code> と同じ設計判断です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const initialValues: RecordInput = {
+  performedOn: toDateString(record.performed_on),
+  workType: record.work_type as WorkType,
+  workTypeOther: record.work_type_other,
+  odometerKm: record.odometer_km,
+  partDetail: record.part_detail,
+  note: record.note,
+}</code></pre>
+      <p>
+        DB の行（スネークケース）から <code>RecordForm</code> が要求する
+        <code>RecordInput</code>（キャメルケース）へ変換します。
+        <code>work_type</code> は DB 上ただの <code>string</code> 型ですが、
+        実際の値は必ず <code>WORK_TYPES</code> のいずれかである保証（DBのCHECK制約）
+        があるため <code>as WorkType</code> でキャストしています
+        （<code>vehicles/$vehicleId/edit.tsx</code> の <code>vehicle_type</code> と同じ扱い）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const existingReadings: OdometerReading[] = records
+  .filter((candidate) =&gt; candidate.id !== record.id &amp;&amp; candidate.odometer_km !== null)
+  .map((candidate) =&gt; ({
+    performedOn: toDateString(candidate.performed_on),
+    odometerKm: candidate.odometer_km as number,
+  }))</code></pre>
+      <p>
+        新規登録ページとの違いはここです。編集中の記録自身
+        （<code>candidate.id !== record.id</code>）を比較対象から除外しないと、
+        「自分自身と比較して走行距離が一致している」ことをもって
+        矛盾なしと誤判定したり、値を変更した瞬間に自分自身との差分で
+        誤って逆行警告が出たりします。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.tsx
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>create.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>create.ts</h1>
+    <div class="doc-path">src/features/maintenance/server/create.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録を新規作成するサーバー関数です。整備記録の新規登録ページ
+      （<code>_authed.vehicles.$vehicleId.records.new.tsx</code>）から、
+      「どの車両の記録か（<code>vehicleId</code>）」と「記録の内容
+      （<code>recordSchema</code> で検証済みの入力）」を受け取って挿入します。
+    </p>
+    <p>
+      このファイルの見どころは、性質の異なる2つのスキーマ
+      （車両スコープと記録内容）を1つの入力スキーマに合成する方法です。
+      Phase 5 の <code>vehicles/server/update.ts</code> が使った
+      <code>vehicleIdSchema.extend(vehicleSchema.shape)</code> という手法は
+      ここでは使えません。詳しくは下記のコード解説を参照してください。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>createRecordSchema</code></td><td>const</td><td><code>vehicleScopeSchema</code> と <code>recordSchema</code> を合成した入力スキーマ</td></tr>
+        <tr><td><code>CreateRecordInput</code></td><td>type（export）</td><td><code>createRecordSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>CreateRecordDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
+        <tr><td><code>createRecordHandler</code></td><td>async function（export）</td><td>整備記録をDBへ挿入し、作成された行を返す純粋なハンドラ</td></tr>
+        <tr><td><code>createRecordFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const createRecordSchema = vehicleScopeSchema.extend({ record: recordSchema })</code></pre>
+      <p>
+        <code>recordSchema</code>（<code>lib/record-schema.ts</code>）は
+        「作業内容が『その他』なら自由入力必須」という制約を <code>.refine()</code>
+        で表現しているため、内部的には <code>ZodEffects</code> になっており
+        <code>.shape</code> プロパティを持ちません。そのため
+        <code>vehicleScopeSchema.extend(recordSchema.shape)</code> という
+        Phase 5 と同じ書き方はできません。
+        代わりに <code>record</code> という1つのフィールドとして丸ごとネストさせています。
+        ネストしたフィールドの型がどんな Zod スキーマであっても
+        <code>.extend()</code> 自体は成立するため、この制約を回避できます
+        （実装前に <code>node -e</code> で実際に動作を確認済み）。
+        結果として入力の形は <code>{ vehicleId, record: { performedOn, workType, ... } }</code>
+        という2階層になります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function createRecordHandler(
+  input: CreateRecordInput,
+  deps: CreateRecordDeps,
+): Promise&lt;MaintenanceRecordRow&gt; {
+  const { data, error } = await deps.supabase
+    .from('maintenance_records')
+    .insert({
+      vehicle_id: input.vehicleId,
+      performed_on: input.record.performedOn,
+      work_type: input.record.workType,
+      work_type_other: input.record.workTypeOther,
+      odometer_km: input.record.odometerKm,
+      part_detail: input.record.partDetail,
+      note: input.record.note,
+    })
+    .select()
+    .single()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        キャメルケースの入力をDBのスネークケース列名へマッピングして挿入します。
+        <code>user_id</code> を渡さないのは <code>vehicles/server/create.ts</code> と同じ理由で、
+        列の既定値 <code>auth.uid()</code> に委ねることでクライアントによる詐称の余地を
+        無くしています。<code>vehicle_id</code> は入力からそのまま渡しますが、
+        他人の <code>vehicle_id</code> を指定した場合は複合外部キー
+        <code>(vehicle_id, user_id)</code> がDBレベルで拒否します
+        （RLS だけでは防げない整合性チェックであることが、この制約が存在する理由そのものです）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const createRecordFn = createServerFn({ method: 'POST' })
+  .validator(createRecordSchema)
+  .handler(({ data }) => createRecordHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        呼び出し側（ルート）は
+        <code>createRecordFn({ data: { vehicleId, record: input } })</code>
+        という形で呼びます。<code>vehicleId</code> と記録の内容を明確に分けて渡すことで、
+        「どの車両の下に作るか」というルーティングの関心事と、
+        「記録として何を保存するか」というフォームの関心事を呼び出し側でも分離できます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/create.ts
+  </footer>
+
+</div>
+</body>
+</html>

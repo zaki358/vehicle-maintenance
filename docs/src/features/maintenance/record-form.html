@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>record-form.tsx</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>record-form.tsx</h1>
+    <div class="doc-path">src/features/maintenance/record-form.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録の新規登録・編集で共用するフォームです。
+      <code>features/vehicles/vehicle-form.tsx</code>（Phase 5）と同じ役割・同じ設計方針
+      （素の HTML + Zod、送信時に <code>recordSchema.safeParse()</code> で検証してから
+      <code>onSubmit</code> を呼ぶ）を踏襲しています。
+    </p>
+    <p>
+      Phase 3 で作成済みの3つの純粋関数を UI に接続する点が、このファイルの中心的な役割です:
+      作業内容が「その他」のときだけ自由入力欄を出す（<code>work-types.ts</code>）、
+      走行距離が既存記録と矛盾していないか警告する（<code>odometer.ts</code>）、
+      部品/型式の入力候補を出す（呼び出し側が作った <code>part-suggestions.ts</code> の結果を
+      <code>&lt;datalist&gt;</code> として表示する）。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RecordFormResult</code></td><td>type（export）</td><td><code>onSubmit</code> の戻り値の型（成功 or エラーメッセージ）</td></tr>
+        <tr><td><code>RecordFormProps</code></td><td>interface</td><td>フォームコンポーネントの props</td></tr>
+        <tr><td><code>RecordForm</code></td><td>function（export）</td><td>整備記録の登録・編集フォーム本体</td></tr>
+        <tr><td><code>computeRegressionWarning</code></td><td>function</td><td>現在の入力値から走行距離逆行警告の表示要否を判定するヘルパー</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>interface RecordFormProps {
+  initialValues?: RecordInput
+  submitLabel: string
+  partSuggestionsList: string[]
+  existingReadings: OdometerReading[]
+  onSubmit: (input: RecordInput) =&gt; Promise&lt;RecordFormResult&gt;
+}</code></pre>
+      <p>
+        <code>partSuggestionsList</code> と <code>existingReadings</code> は、
+        どちらもこのフォーム自身では取得しません（<code>lib/</code> の純粋関数と同じく
+        Supabase を知らない）。呼び出し側のルートが
+        <code>listPartDetailsFn</code>/<code>listRecordsFn</code> で取得したデータを
+        <code>part-suggestions.ts</code>/そのまま整形して渡します。
+        編集時、<code>existingReadings</code> には編集対象の記録自身を含めないのが
+        呼び出し側の責務です（自分自身と比較して「逆行している」と誤検知させないため）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>function handleWorkTypeChange(next: WorkType) {
+  setWorkType(next)
+  if (!isOtherWorkType(next)) {
+    setWorkTypeOther('')
+  }
+}</code></pre>
+      <p>
+        作業内容のプリセットに戻したとき、隠れる自由入力欄の値もクリアします。
+        こうしないと、一度「その他」を選んで文字を入力した後にプリセットへ戻した際、
+        画面には見えない <code>workTypeOther</code> の値が state に残ってしまい、
+        次に再び「その他」を選んだときに古い値が復活してユーザーを混乱させます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const regressionWarning = computeRegressionWarning(performedOn, odometerKm, existingReadings)
+...
+function computeRegressionWarning(
+  performedOn: string,
+  odometerKm: string,
+  existingReadings: OdometerReading[],
+): boolean {
+  if (!isDateString(performedOn) || odometerKm === '') {
+    return false
+  }
+  const parsedOdometerKm = Number(odometerKm)
+  if (Number.isNaN(parsedOdometerKm)) {
+    return false
+  }
+  return isOdometerRegression(
+    { performedOn: performedOn as DateString, odometerKm: parsedOdometerKm },
+    existingReadings,
+  )
+}</code></pre>
+      <p>
+        まだ検証を通していない入力途中の文字列（<code>performedOn</code>/<code>odometerKm</code>
+        は state 上ただの <code>string</code>）を、<code>isDateString</code> で実在する日付か
+        確認してから <code>lib/odometer.ts</code> の <code>isOdometerRegression</code> に渡します。
+        日付が未入力・不正、または走行距離が未入力・数値でない間は警告を出さない
+        （<code>false</code> を返す）ことで、入力途中に誤った警告が点滅するのを防いでいます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>{regressionWarning && &lt;p role="status"&gt;走行距離が他の記録と前後関係が逆になっています。ご確認ください。&lt;/p&gt;}
+...
+{error &amp;&amp; &lt;p role="alert"&gt;{error}&lt;/p&gt;}</code></pre>
+      <p>
+        走行距離の逆行警告は <code>role="status"</code>、入力検証エラーは
+        <code>role="alert"</code> と役割を分けています。前者は「送信をブロックしない
+        参考情報」（走行距離計を交換した等、正当な理由で矛盾するケースがありうる）、
+        後者は「送信できない致命的な問題」だからです。テスト上もこの2つを別の
+        ロールとして区別して検証できます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;input
+  list={PART_DETAIL_SUGGESTIONS_ID}
+  value={partDetail}
+  onChange={(event) =&gt; setPartDetail(event.target.value)}
+/&gt;
+...
+&lt;datalist id={PART_DETAIL_SUGGESTIONS_ID}&gt;
+  {partSuggestionsList.map((suggestion) =&gt; (
+    &lt;option key={suggestion} value={suggestion}&gt;
+      {suggestion}
+    &lt;/option&gt;
+  ))}
+&lt;/datalist&gt;</code></pre>
+      <p>
+        ブラウザ標準の <code>&lt;datalist&gt;</code> でサジェストを実現しています。
+        専用のコンボボックスUIコンポーネントを作らず標準機能に任せることで、
+        キーボード操作・スクリーンリーダー対応をブラウザに委ねられます。
+        テキストとしても選択肢を出すため <code>&lt;option&gt;</code> に
+        <code>value</code> と子テキストの両方を設定しています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/record-form.tsx
+  </footer>
+
+</div>
+</body>
+</html>

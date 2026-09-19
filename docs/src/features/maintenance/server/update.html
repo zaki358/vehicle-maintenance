@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>update.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>update.ts</h1>
+    <div class="doc-path">src/features/maintenance/server/update.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録を更新するサーバー関数です。整備記録の編集ページ
+      （<code>_authed.vehicles.$vehicleId.records.$recordId.edit.tsx</code>）から、
+      「どの記録を（<code>id</code>）」「どんな内容に（<code>recordSchema</code> で
+      検証済みの入力）」更新するかを受け取ります。
+    </p>
+    <p>
+      <code>create.ts</code> と同じ理由で <code>record</code> フィールドにネストさせて
+      スキーマを合成しています。<code>vehicle_id</code> は更新対象に含めていません。
+      記録を別の車両へ付け替える操作はこのアプリの仕様に存在しないためです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>updateRecordSchema</code></td><td>const</td><td><code>recordIdSchema</code> と <code>recordSchema</code> を合成した入力スキーマ</td></tr>
+        <tr><td><code>UpdateRecordInput</code></td><td>type（export）</td><td><code>updateRecordSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>UpdateRecordDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
+        <tr><td><code>updateRecordHandler</code></td><td>async function（export）</td><td>整備記録を更新し、更新後の行（または <code>null</code>）を返す純粋なハンドラ</td></tr>
+        <tr><td><code>updateRecordFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const updateRecordSchema = recordIdSchema.extend({ record: recordSchema })</code></pre>
+      <p>
+        <code>create.ts</code> の <code>createRecordSchema</code> と対称的な構成です。
+        こちらは「どの記録を」を表す <code>recordIdSchema</code>（<code>{ id }</code>）に、
+        「どんな内容に」を表す <code>record</code> フィールドを足しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function updateRecordHandler(
+  input: UpdateRecordInput,
+  deps: UpdateRecordDeps,
+): Promise&lt;MaintenanceRecordRow | null&gt; {
+  const { data, error } = await deps.supabase
+    .from('maintenance_records')
+    .update({
+      performed_on: input.record.performedOn,
+      work_type: input.record.workType,
+      work_type_other: input.record.workTypeOther,
+      odometer_km: input.record.odometerKm,
+      part_detail: input.record.partDetail,
+      note: input.record.note,
+    })
+    .eq('id', input.id)
+    .select()
+    .maybeSingle()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>.maybeSingle()</code> を使い、存在しない記録・他人の記録（RLSがブロック）を
+        区別せず <code>null</code> を返します。<code>vehicles/server/update.ts</code> と同じ理由で、
+        「この ID は他人が使っている」という情報を漏らさないためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const updateRecordFn = createServerFn({ method: 'POST' })
+  .validator(updateRecordSchema)
+  .handler(({ data }) => updateRecordHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        呼び出し側は <code>updateRecordFn({ data: { id: record.id, record: input } })</code>
+        という形で呼びます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/update.ts
+  </footer>
+
+</div>
+</body>
+</html>

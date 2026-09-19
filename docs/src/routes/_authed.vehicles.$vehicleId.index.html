@@ -17,9 +17,15 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      車両の詳細ページです（URL: <code>/vehicles/$vehicleId</code>。親の
-      レイアウトルートと同じ URL に <code>.index</code> の子ルートとして重なります）。
-      車両区分・車検満了日・備考の表示、編集ページへのリンク、削除ボタンを持ちます。
+      車両の詳細ページです（URL: <code>/vehicles/$vehicleId</code>）。
+      車両情報（区分・車検満了日・備考）の表示と編集・削除に加え、
+      Phase 6 でこのページに**整備記録の一覧**を統合しました。
+      作業内容での絞り込み、記録ごとの編集リンクと削除ボタンを持ちます。
+    </p>
+    <p>
+      整備記録の追加は専用ページ（<code>records/new</code>）に分けていますが、
+      一覧・フィルタ・削除はこの詳細ページ自身が担当します。
+      車両1台のページに来れば、その車両の整備状況がすべて見える構成です。
     </p>
   </section>
 
@@ -30,8 +36,9 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>Route</code></td><td>const（export）</td><td>詳細ページのルート定義</td></tr>
-        <tr><td><code>VehicleDetailPage</code></td><td>function（component）</td><td>表示と削除処理</td></tr>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>詳細ページのルート定義。<code>loader</code>で整備記録一覧を取得</td></tr>
+        <tr><td><code>toFilterable</code></td><td>function</td><td>DBの行を <code>filter-records.ts</code>/<code>sort-records.ts</code> が使える形へ変換</td></tr>
+        <tr><td><code>VehicleDetailPage</code></td><td>function（component）</td><td>表示・車両削除・記録の絞り込みと削除</td></tr>
       </tbody>
     </table>
   </section>
@@ -40,50 +47,81 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>const { vehicle } = Route.useRouteContext()</code></pre>
+      <pre><code>export const Route = createFileRoute('/_authed/vehicles/$vehicleId/')({
+  loader: ({ params }) =&gt; listRecordsFn({ data: { vehicleId: params.vehicleId } }),
+  component: VehicleDetailPage,
+})</code></pre>
       <p>
-        親のレイアウトルート（<code>_authed.vehicles.$vehicleId.tsx</code>）の
-        <code>beforeLoad</code> が積んだ <code>vehicle</code> を受け取ります。
-        自分で <code>getVehicleFn</code> を呼び直す必要はありません。
-        <code>_authed.index.tsx</code> が <code>user</code> を受け取るのと同じ仕組みです。
+        Phase 5 まではこのルートに <code>loader</code> がなく、親レイアウトが積んだ
+        <code>vehicle</code> だけを表示していました。Phase 6 で整備記録一覧を
+        表示するために <code>loader</code> を追加し、ページ表示前に
+        <code>listRecordsFn</code> で該当車両の整備記録を取得します
+        （TanStack Router のローダーはナビゲーション中に並行実行される）。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>async function handleDelete() {
-  const confirmed = window.confirm(`「${vehicle.name}」を削除します。整備記録も全て削除されます。よろしいですか？`)
-  if (!confirmed) {
-    return
-  }
-  setDeleting(true)
-  try {
-    await deleteVehicleFn({ data: { id: vehicle.id } })
-    await navigate({ to: '/vehicles' })
-  } finally {
-    setDeleting(false)
+      <pre><code>function toFilterable(row: MaintenanceRecordRow) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    workType: row.work_type as WorkType,
+    workTypeOther: row.work_type_other,
+    performedOn: toDateString(row.performed_on),
+    odometerKm: row.odometer_km,
+    partDetail: row.part_detail,
   }
 }</code></pre>
       <p>
-        削除は取り消せない操作（かつ整備記録も一緒に消える）なので、
-        <code>window.confirm</code> でのワンクッションを必ず挟みます。
-        キャンセルされたら何もせずに戻り、確認が取れた場合のみ
-        <code>deleteVehicleFn</code> を呼んで一覧ページへ遷移します。
+        DB の行はスネークケース（<code>work_type</code>・<code>performed_on</code>）ですが、
+        Phase 3 で作った純粋関数 <code>filterRecords</code>/<code>sortRecords</code> は
+        キャメルケースの形を要求します。この変換はルート（UI層）の責務とし、
+        <code>lib/</code> 側には持ち込みません（<code>lib/</code> は Supabase の列名を
+        一切知らない設計のため）。<code>toDateString</code> は
+        <code>performed_on</code> が常に検証済みの <code>date</code> 列であることが
+        前提で、不正な値が来ればここで例外になります。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>&lt;p&gt;
-  車検満了日:{' '}
-  {vehicle.shaken_expiry_date ? formatJa(toDateString(vehicle.shaken_expiry_date)) : '車検対象外'}
-&lt;/p&gt;</code></pre>
+      <pre><code>const visibleRecords = useMemo(() =&gt; {
+  const filterable = records.map(toFilterable)
+  const filtered = filterRecords(filterable, {
+    workType: workTypeFilter === 'all' ? undefined : workTypeFilter,
+  })
+  return sortRecords(filtered, 'newest')
+}, [records, workTypeFilter])</code></pre>
       <p>
-        DB の <code>shaken_expiry_date</code> は <code>null</code> 許容の生の
-        <code>string</code> です。<code>null</code>（250cc以下のバイク等）なら
-        「車検対象外」と表示し、値があれば <code>toDateString</code> で
-        ブランド型 <code>DateString</code> へ検証してから <code>formatJa</code>
-        （<code>date-fns</code> を使う表示専用の関数）で日本語表記に整形します。
-        素の文字列を直接 <code>new Date()</code> に渡さないのが、このプロジェクトの
-        JST/UTC のずれを防ぐ原則です。
+        絞り込み（作業内容）と並び替え（新しい順固定）は、どちらもPhase 3の
+        純粋関数にそのまま委ねています。UI側が持つロジックは「どのフィルタ条件を
+        選んだか」という状態だけです。<code>filterRecords</code> の
+        <code>workType</code> は「未指定なら絞り込まない」設計のため、
+        「すべて」を選んだときは <code>undefined</code> を渡します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>async function handleDeleteRecord(recordId: string) {
+  const confirmed = window.confirm('この整備記録を削除します。よろしいですか？')
+  if (!confirmed) {
+    return
+  }
+  setDeletingRecordId(recordId)
+  try {
+    await deleteRecordFn({ data: { id: recordId } })
+    await router.invalidate()
+  } finally {
+    setDeletingRecordId(null)
+  }
+}</code></pre>
+      <p>
+        車両削除（<code>handleDeleteVehicle</code>）は削除後に一覧ページへ
+        <code>navigate</code> しますが、整備記録の削除は同じページに留まって
+        一覧だけを更新したいため、<code>useRouter().invalidate()</code> で
+        <code>loader</code> を再実行させます。削除対象のIDを
+        <code>deletingRecordId</code> に保持し、その行のボタンだけを
+        <code>disabled</code> にすることで、複数行を誤って連打しても
+        他の行の操作は妨げません。
       </p>
     </div>
 

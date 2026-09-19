@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>list-part-details.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>list-part-details.ts</h1>
+    <div class="doc-path">src/features/maintenance/server/list-part-details.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      整備記録フォームの「部品/型式」欄でサジェスト候補を出すために、
+      指定した車両の <code>part_detail</code> 列だけを実施日の新しい順で取得する
+      サーバー関数です。整備記録の全列を取得する <code>list.ts</code> とは別に
+      用意しているのは、サジェストには不要な列（備考・走行距離など）まで
+      転送する無駄を避けるためです。
+    </p>
+    <p>
+      重複除去や部分一致での絞り込みはここでは行いません。取得した生データを
+      Phase 3 で作成済みの純粋関数 <code>maintenance/lib/part-suggestions.ts</code> に渡し、
+      呼び出し側（フォームのあるルート）で行います。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PartDetailRow</code></td><td>type（export）</td><td><code>maintenance_records</code> 行のうち <code>part_detail</code> 列だけを持つ型</td></tr>
+        <tr><td><code>ListPartDetailsDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
+        <tr><td><code>listPartDetailsHandler</code></td><td>async function（export）</td><td>指定車両の <code>part_detail</code> 一覧を取得する純粋なハンドラ</td></tr>
+        <tr><td><code>listPartDetailsFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type PartDetailRow = Pick&lt;Tables&lt;'maintenance_records'&gt;, 'part_detail'&gt;</code></pre>
+      <p>
+        <code>Tables&lt;'maintenance_records'&gt;</code>（全列の行型）から
+        <code>part_detail</code> だけを <code>Pick</code> しています。
+        <code>.select('part_detail')</code> で実際に取得する列と型を一致させ、
+        「取得していない列にアクセスできてしまう」ことを型で防いでいます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function listPartDetailsHandler(
+  input: VehicleScopeInput,
+  deps: ListPartDetailsDeps,
+): Promise&lt;PartDetailRow[]&gt; {
+  const { data, error } = await deps.supabase
+    .from('maintenance_records')
+    .select('part_detail')
+    .eq('vehicle_id', input.vehicleId)
+    .order('performed_on', { ascending: false })
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>list.ts</code> とほぼ同じ形ですが、<code>select('*')</code> ではなく
+        <code>select('part_detail')</code> にしている点だけが異なります。
+        新しい順で返すのは、<code>part-suggestions.ts</code> が「配列の登場順を保つ」
+        設計になっており、最近使った値ほどサジェストの先頭に出したいためです。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/list-part-details.ts
+  </footer>
+
+</div>
+</body>
+</html>

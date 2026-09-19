@@ -3,13 +3,13 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-19(Phase 5 完了。車両CRUDのブラウザ動作確認まで完了)
+最終更新: 2026-09-19(Phase 6 完了。整備記録CRUDのブラウザ動作確認まで完了)
 
 ---
 
 ## 現在地
 
-**Phase 1〜5 完了。次はPhase 6(整備記録CRUD)。**
+**Phase 1〜6 完了。次はPhase 7(ダッシュボードと車検アラート)。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
@@ -227,6 +227,74 @@
 - [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(243テスト全通過) /
       `npm run build` 全て green** — Phase 5完了
 
+### Phase 6（整備記録CRUD）
+
+- [x] **`src/features/maintenance/lib/vehicle-scope-schema.ts` 完成** — `vehicleScopeSchema`。
+      `{ vehicleId: uuid }`。`list`/`list-part-details`の入口で使う。フィールド名を
+      `vehicleId`にしているのは、`recordIdSchema`（記録自身の`id`）と合成したときに
+      フィールド名が衝突しないため。2テスト
+- [x] **`src/features/maintenance/lib/record-id-schema.ts` 完成** — `recordIdSchema`。
+      `{ id: uuid }`。vehicles/lib/vehicle-id-schema.tsと同型だが対象リソースが
+      異なることを明示するため独立ファイルにした。2テスト
+- [x] **整備記録CRUDの入力スキーマ合成パターンを確立** — `recordSchema`（Phase 3、
+      `.refine()`で作られたZodEffects）は`.shape`を持たないため、Phase 5の
+      `vehicleIdSchema.extend(vehicleSchema.shape)`という手法が使えない。
+      代わりに`vehicleScopeSchema.extend({ record: recordSchema })`
+      （create）／`recordIdSchema.extend({ record: recordSchema })`（update）という
+      **ネストしたフィールドとして合成**する方式を採用。`.extend()`はネストする
+      フィールドの型を問わないため、この制約下でも動作する。実装前に`node -e`で
+      Zod 4の実際の挙動（ネストしたrefineスキーマのエラーpathが`record.xxx`に
+      正しくネストされること）を確認してから実装した
+- [x] **`src/features/maintenance/server/{list,create,update,delete,list-part-details}.ts` 完成** —
+      実装プランどおり5本。vehicles/serverと同じ`xxxHandler(deps注入)+xxxFn`パターン。
+      `list`/`list-part-details`は`vehicleId`でスコープし`user_id`絞り込みは書かない
+      （RLSの`maintenance_records_select_own`等に委任）。`update`は`vehicle_id`を
+      更新対象に含めない（記録を別の車両へ付け替える操作は仕様に無い）。
+      専用の「1件取得」関数（`get.ts`相当）は作っていない——実装プランの
+      列挙どおり5本で、編集ルートは`listRecordsFn`+`.find()`で代替（下記参照）。計11テスト
+- [x] **`src/features/maintenance/record-form.tsx` 完成** — 整備記録の登録・編集で
+      共用するフォーム。vehicle-form.tsxと同じ設計（素のHTML+Zod、送信時に
+      `recordSchema.safeParse()`）。作業内容「その他」選択で自由入力欄が出て、
+      プリセットに戻すと値がクリアされる。走行距離逆行警告（`isOdometerRegression`）は
+      `role="status"`（非ブロッキング）、入力検証エラーは`role="alert"`と役割を分けた。
+      部品/型式は`<datalist>`標準機能でサジェスト。8テスト
+- [x] **maintenance/lib新規2ファイル・server5ファイル・record-form.tsxの
+      解説ドキュメント生成完了** — `docs/src/features/maintenance/lib/{vehicle-scope-schema,
+      record-id-schema}.html`、`docs/src/features/maintenance/server/*.html`、
+      `docs/src/features/maintenance/record-form.html`
+- [x] **`_authed.vehicles.$vehicleId.index.tsx`を拡張** — 車両詳細ページに整備記録
+      一覧を統合。`loader`で`listRecordsFn`を呼び、DB行を`toFilterable`で
+      キャメルケースへ変換してからPhase 3の`filterRecords`/`sortRecords`
+      （作業内容フィルタ・新しい順固定）にそのまま渡す設計。整備記録の削除は
+      同じページに留まりたいため`useRouter().invalidate()`で`loader`を再実行
+      （車両削除は`navigate`で一覧へ戻る、という既存の使い分けと対比）。
+      解説ドキュメントも再生成済み
+- [x] **`_authed.vehicles.$vehicleId.records.new.tsx`／`.records.$recordId.edit.tsx` 完成** —
+      新規登録・編集ルート。どちらも`listRecordsFn`+`listPartDetailsFn`を
+      `Promise.all`で並行取得し、`part-suggestions.ts`/`odometer.ts`（Phase 3）に
+      橋渡しする。編集ルートは専用の「1件取得」サーバー関数を作らず、車両スコープの
+      一覧から`.find()`で絞り込み、見つからなければ`_authed.vehicles.$vehicleId.tsx`と
+      同じ`notFound()`パターンで統一。編集時の走行距離逆行チェックは
+      編集対象の記録自身を比較対象から除外する。解説ドキュメント生成完了
+- [x] **`npm run build`でrouteTree.gen.tsの再生成を確認** — 新規3ルート
+      （records/new、records/$recordId/edit、拡張済み$vehicleId/index）が
+      正しく登録された
+- [x] **lintで2件のIssue修正** — ①`record-form.tsx`の`isDateString`型ガード後の
+      不要な`as DateString`キャスト（`@typescript-eslint/no-unnecessary-type-assertion`）
+      を削除。②一覧表示の区切り文字に全角スペース「　」を使っていたのが
+      `no-irregular-whitespace`に抵触したため「・」に変更
+- [x] **開発用Supabaseで使い捨てテストユーザーを作成しブラウザで実動作確認** —
+      車両登録→整備記録2件登録（うち1件は「その他」＋走行距離逆行状態で登録できる
+      ことを確認）→一覧が新しい順で表示→作業内容フィルタで絞り込み確認→
+      編集画面で初期値反映・逆行警告（自分自身は除外して比較）を確認→走行距離を
+      修正すると警告が消えることを確認→更新→削除（`router.invalidate()`で
+      ページ遷移なしに一覧から消えることを確認）→削除済み記録のURL直叩きで
+      404画面（整備記録が見つかりません）を確認→車両ごと削除。
+      テストユーザーは確認後すぐ削除済み（Phase 4/5と同じ使い捨て運用、
+      一時スクリプト`scripts/_verify-phase6-user.ts`もコミット前に削除済み）
+- [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(266テスト全通過) /
+      `npm run build` 全て green** — Phase 6完了
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -313,41 +381,40 @@
 
 ## 次にやること
 
-**Phase 5（車両 CRUD）— 完了。**
+**Phase 6（整備記録 CRUD）— 完了。**
 
-- ~~`features/vehicles/server/(list,get,create,update,delete)`~~ — **完成済み**
-- ~~`_authed.vehicles.{index,new}.tsx`、`_authed.vehicles.$vehicleId.*`~~ — **完成済み**
-- ~~車検満了日が任意（250cc以下は車検なし）であることをUIで扱う~~ — **完成済み**
-  （`<input type="date">`の空値を`null`に変換。「車検対象外」表示で確認済み）
-- ~~ブラウザでの動作確認~~ — **完成済み**（登録・詳細表示・編集・削除・404の一連を確認済み）
+- ~~`features/maintenance/server/(list,create,update,delete,list-part-details)`~~ — **完成済み**
+- ~~`_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`~~ — **完成済み**
+- ~~`_authed.vehicles.$vehicleId.index.tsx`に整備記録一覧・フィルタ・削除を統合~~ — **完成済み**
+- ~~プリセット＋「その他」自由入力、部品サジェスト、走行距離逆行警告をUIに反映~~ — **完成済み**
+- ~~ブラウザでの動作確認~~ — **完成済み**（登録・一覧・フィルタ・編集・逆行警告・削除・404の一連を確認済み）
 
-**次は Phase 6（整備記録 CRUD）に着手する**:
-`features/maintenance/*`（`lib`は既にPhase3で完成済み：`work-types`/`record-schema`/
-`filter-records`/`sort-records`/`part-suggestions`/`odometer`）に対応する
-`server/(list,create,update,delete,list-part-details)`と関連ルートを実装する。
-プリセット選択＋「その他」で自由入力欄が出る挙動、部品サジェスト（過去入力値）、
-作業内容でのフィルタ、走行距離の逆行警告（`isOdometerRegression`）をUIに反映する。
-ルートは車両詳細ページ配下（`_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`
-など、実装プランのディレクトリ構成を参照）になる見込み。
-Phase 5で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォームはfeatures/*直下に
-素のHTML+Zodで実装しlib/には置かない」「routes/**は単体テスト対象外でE2Eに委ねる」の
-3パターンをそのまま踏襲すること。
+**次は Phase 7（ダッシュボードと車検アラート）に着手する**:
+`features/dashboard/*`（`lib`は既にPhase3で完成済み：`since-last-service`/`build-summary`）と
+`features/shaken/*`（`lib`も既にPhase3で完成済み：`days-remaining`/`alert-tier`/`renewal`/`messages`）の
+UI実装、および`complete-shaken`のRPC呼び出し（`security invoker`のPostgres関数、
+記録追加＋満了日更新をアトミックに実行）を行う。`_authed.index.tsx`
+（Phase4作成の仮ホーム画面）をダッシュボード本実装に置き換える。
+Phase 5/6で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォームはfeatures/*直下に
+素のHTML+Zodで実装しlib/には置かない」「routes/**は単体テスト対象外でE2Eに委ねる」
+「1件取得が必要な場面では専用get.tsを作らずlistFn+.find()で代替する場合がある」の
+パターンをそのまま踏襲すること。
 実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
 先に読み直してから着手すること。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 243 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 266 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-**中断時点**: Phase 4 完了。Phase 5（車両 CRUD）に未着手。
-まだ未コミットの変更（`src/integrations/`・`src/lib/supabase/env*`・`src/features/auth/*`・
-`src/routes/{_authed*,login,set-password}.tsx`・`scripts/invite-user.ts`・
-`eslint.config.js`・`docs/`・`.claude/launch.json` など）があるので、
+**中断時点**: Phase 6 完了。Phase 7（ダッシュボードと車検アラート）に未着手。
+まだ未コミットの変更（`src/features/maintenance/lib/{vehicle-scope-schema,record-id-schema}.*`・
+`src/features/maintenance/server/*`・`src/features/maintenance/record-form.*`・
+`src/routes/_authed.vehicles.$vehicleId.index.tsx`・
+`src/routes/_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`・
+`src/routeTree.gen.ts`・`docs/src/features/maintenance/*`・
+`docs/src/routes/_authed.vehicles.$vehicleId.*` など）があるので、
 コミットするかどうか依頼者に確認する。
-**中断時点**: Phase 2 完了。Phase 4（認証）に未着手。
-まだ未コミットの変更（`supabase/`・`docs/supabase/`・`vitest.rls.config.ts`・
-`package.json`・`docs/setup-supabase.md`）があるので、コミットするかどうか依頼者に確認する。
 
 ---
 
@@ -425,7 +492,7 @@ Phase 5で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォー�
 - [x] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **全完成（date/shaken/vehicles/maintenance/dashboard/auth）**
 - [x] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト。ブラウザで動作確認済み）
 - [x] Phase 5 — 車両 CRUD（server 5本 + vehicle-form + ルート5本。ブラウザで動作確認済み）
-- [ ] Phase 6 — 整備記録 CRUD
+- [x] Phase 6 — 整備記録 CRUD（server 5本 + record-form + ルート3本。ブラウザで動作確認済み）
 - [ ] Phase 7 — ダッシュボードと車検アラート
 - [ ] Phase 8 — 検証（E2E / レビュー）とデプロイ
 - [ ] Phase 9 — docs の HTML 解説ページ
