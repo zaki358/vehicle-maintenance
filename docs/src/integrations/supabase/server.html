@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>server.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>server.ts</h1>
+    <div class="doc-path">src/integrations/supabase/server.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      サーバー側（TanStack Start のサーバー関数・SSR）で使う Supabase クライアントを
+      作る、このプロジェクトで最もリスクが高いファイルです。実装プランで
+      「このスタック最悪のバグ」と名指しされている落とし穴 —
+      サーバー用クライアントをモジュールスコープでメモ化すると、Cloudflare Workers の
+      isolate 再利用によって<strong>別人のセッションを掴んでしまう</strong> — を
+      避けるため、値ではなく「呼ぶたびに新しいクライアントを組み立てる関数」を
+      exportしています。
+    </p>
+    <p>
+      Cookie の読み書きは TanStack Start の <code>getCookies</code>/<code>setCookie</code>
+      （リクエストスコープのコンテキストから読み書きするため、Request/Response を
+      引数で受け渡す必要がない）を、Supabase が要求する
+      <code>getAll</code>/<code>setAll</code> の形に変換して橋渡ししています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>createSupabaseServerClient</code></td><td>function（export）</td><td>リクエストごとに新しいサーバー用 Supabase クライアントを作って返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function createSupabaseServerClient() {
+  const env = getSupabaseEnv()
+  return createServerClient&lt;Database&gt;(env.url, env.publishableKey, {
+    cookies: { ... },
+  })
+}</code></pre>
+      <p>
+        トップレベルに <code>const client = createServerClient(...)</code> のような
+        変数が一切無いことに注目してください。この関数を呼ぶ側
+        （<code>features/auth/server/*</code> の各サーバー関数）は、処理のたびに
+        必ずこの関数を呼び直します。1つのインスタンスを使い回すコードは
+        どこにも存在しません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>getAll() {
+  return Object.entries(getCookies()).map(([name, value]) => ({ name, value }))
+},</code></pre>
+      <p>
+        TanStack Start の <code>getCookies()</code> は
+        <code>{ 名前: 値 }</code> という Record を返しますが、Supabase の
+        <code>getAll</code> は <code>{ name, value }[]</code> という配列を要求します。
+        この変換だけを行う薄いアダプタです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>setAll(cookiesToSet) {
+  for (const { name, value, options } of cookiesToSet) {
+    setCookie(name, value, options)
+  }
+},</code></pre>
+      <p>
+        ログイン・ログアウト・トークンのリフレッシュが起きるたびに、Supabase は
+        更新後の Cookie 一覧を <code>setAll</code> に渡してきます。1件ずつ
+        TanStack Start の <code>setCookie</code> に橋渡しするだけで、
+        <code>httpOnly</code> などのオプションはそのまま素通りします。
+        呼び出し側（<code>login.ts</code> など）がこの配線を意識する必要は一切ありません
+        — <code>supabase.auth.signInWithPassword()</code> を呼べば、Cookie は
+        このクライアントが自動的に書き込みます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <p>
+        <strong>Cookie のオプションはあえて指定せず、<code>@supabase/ssr</code> の
+        デフォルト（<code>httpOnly: false</code> / <code>sameSite: 'lax'</code> /
+        <code>path: '/'</code>）のままにしています。</strong>
+        「セッション Cookie は httpOnly にすべき」という一般的なセキュリティ知識とは
+        逆に見えますが、Supabase 公式ドキュメント（Auth Server-Side Rendering /
+        Advanced guide）が明示的に「不要」としている設計です。理由は、ブラウザ側の
+        Supabase クライアント（<code>client.ts</code>）がセッションのリフレッシュ
+        トークンを自分で読み書きしてセッションを維持する構成になっているため。
+        httpOnly にしてしまうとブラウザ側クライアントが Cookie を一切読めなくなり、
+        トークンのリフレッシュや <code>set-password.tsx</code> の招待リンク処理
+        （<code>detectSessionInUrl</code>）が壊れます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/integrations/supabase/server.ts
+  </footer>
+
+</div>
+</body>
+</html>

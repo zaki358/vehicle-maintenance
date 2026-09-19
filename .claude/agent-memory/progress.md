@@ -3,13 +3,13 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-10(Phase 2 着手。開発用DBにマイグレーション適用済み)
+最終更新: 2026-09-19(Phase 4 完了。認証まわりのブラウザ動作確認まで完了)
 
 ---
 
 ## 現在地
 
-**Phase 1・Phase 2・Phase 3 完了。次はPhase 4(認証)。**
+**Phase 1〜4 完了。次はPhase 5(車両CRUD)。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
@@ -150,6 +150,38 @@
       で再開してから実行**（データは無事だった）。`vehicles`・`maintenance_records`テーブルの
       作成を依頼者がTable Editorで確認済み。**Phase 2 完了**
 
+### Phase 4（認証）
+
+- [x] **`src/lib/supabase/env.ts` 完成** — `getSupabaseEnv()`。`VITE_SUPABASE_URL`/
+      `VITE_SUPABASE_PUBLISHABLE_KEY` をZodで検証。3テスト
+- [x] **`src/integrations/supabase/client.ts` 完成** — `getSupabaseBrowserClient()`。
+      ブラウザ用シングルトン。2テスト
+- [x] **`src/integrations/supabase/server.ts` 完成** — `createSupabaseServerClient()`。
+      呼ぶたびに新しいクライアントを返す（モジュールスコープでメモ化しない）。
+      TanStack Startの`getCookies`/`setCookie`とSupabaseの`getAll`/`setAll`を橋渡し。4テスト
+- [x] **`src/features/auth/require-user.ts` 完成** — `requireUser()`。未ログインなら
+      `/login`へのredirectを投げる純粋関数。2テスト
+- [x] **`src/features/auth/server/{get-session,login,logout}.ts` 完成** — `createServerFn`で
+      包んだサーバー関数3本。実処理は`deps`注入可能な`xxxHandler`として分離し、
+      Supabaseクライアントをモックしてユニットテスト（DBアクセスなし）。計9テスト
+- [x] **`src/routes/{_authed,_authed.index,login,set-password}.tsx` 完成** — 認証ガード
+      レイアウト・ログイン後仮ページ・ログイン画面・パスワード設定画面
+- [x] **`scripts/invite-user.ts` 完成** — オーナーがローカルで実行する招待スクリプト
+      （`node scripts/invite-user.ts <email> [redirectTo]`）。Claudeは実行しない
+      （`SUPABASE_SECRET_KEY`を扱わない方針のため）
+- [x] **Phase 4全ファイルの解説ドキュメント生成完了** — `docs/src/lib/supabase/env.html`、
+      `docs/src/integrations/supabase/{client,server}.html`、
+      `docs/src/features/auth/require-user.html`、
+      `docs/src/features/auth/server/{get-session,login,logout}.html`、
+      `docs/src/routes/{_authed,_authed.index,login,set-password}.html`、
+      `docs/scripts/invite-user.html`
+- [x] **`vite dev`で実ログイン動作をブラウザ確認済み** — 開発用Supabaseに使い捨てテストユーザーを
+      Admin APIで作成 → 未ログイン`/`アクセスで`/login`へリダイレクト確認 →
+      正しいパスワードでログイン成功・仮ダッシュボード表示確認 → ログアウトで`/login`へ戻る確認 →
+      誤ったパスワードで日本語エラーメッセージ表示確認。テストユーザーは確認後すぐ削除済み
+- [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`（223テスト全通過） /
+      `npm run build` 全て green** — Phase 4完了
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -186,37 +218,85 @@
   TypeScriptタブの型定義を全文コピー→Claudeに貼り付けてもらい`src/lib/supabase/database.types.ts`
   として保存。次回、型の再生成が必要になったときも同じ方法を使うこと
 
+- **Supabaseクライアントの配置を、プラン記載の`src/lib/supabase/{client,server}.ts`から
+  `src/integrations/supabase/{client,server}.ts`へ変更した。**
+  理由: `src/**/lib/**`にはReact/TanStack/Supabaseのimportを禁止するESLintの境界ルールが
+  既に敷かれており、client.ts/server.tsは`@supabase/ssr`のimportが必須のため文字通り矛盾する。
+  境界ルールを緩めず（例外を増やすと1か月で崩れる、と当のESLintコメントに書いてある）、
+  「外部SDKをこのアプリに配線する層」として`integrations/`を新設（TanStack Startの作例で
+  実際に使われている命名）。`src/lib/supabase/env.ts`だけは純粋（Supabase自体をimportしない）
+  ので`lib/`に残した。次回以降、似た「SDKラッパーだがlib/に置きたくなるもの」が出たら
+  `integrations/`を使うこと
+- **プラン文書の「Cookieはhttpolyに」という記述は誤りと判明、訂正して実装した。**
+  理由: Supabase公式ドキュメント（Auth Server-Side Rendering → Advanced guide、
+  "How do I make the cookies HttpOnly?"の項）が「不要」と明記。`@supabase/ssr`は
+  ブラウザ側クライアントがリフレッシュトークンを読み書きしてセッションを維持する設計であり、
+  httpOnlyにするとその読み書きができなくなり、招待リンクの自動セッション確立
+  （`detectSessionInUrl`）やトークンリフレッシュが壊れる。実装は`@supabase/ssr`の
+  デフォルト（`httpOnly: false`/`sameSite: 'lax'`）のまま、`cookieOptions`を一切上書きしていない。
+  次回以降、プランに書かれた内容でも「最新APIとの差分」の対象になりうる技術的決定は
+  実装前に公式ドキュメントで裏取りすること（このプロジェクトのCLAUDE.mdが既に
+  「訓練知識は古い」と注記している領域）
+- **サーバー関数のテスト用handler関数にデフォルト引数で`createSupabaseServerClient()`を
+  埋め込むと、TanStack Startのビルドが import-protection エラーで失敗することが判明。**
+  理由: `_authed.tsx`（クライアントにもバンドルされる）が`getSessionFn`を使うために
+  `get-session.ts`をimportすると、デフォルト引数として書かれた
+  `createSupabaseServerClient`（`@tanstack/react-start/server`に依存）への参照が
+  モジュールのトップレベルから静的に見え、クライアントバンドルに巻き込まれてしまう。
+  対策: `xxxHandler(deps: XxxDeps)`のdepsを必須にし、`createSupabaseServerClient()`の
+  呼び出しは`createServerFn(...).handler(() => xxxHandler({ supabase: createSupabaseServerClient() }))`
+  という`.handler()`コールバックの中だけに押し込める（`get-session.ts`/`login.ts`/`logout.ts`
+  で統一）。次回以降、`features/*/server/`にサーバー関数を追加するときはこのパターンを踏襲すること
+- **招待メール（`inviteUserByEmail`）はPKCE非対応と判明。** Supabase公式ドキュメントが
+  「招待する側とリンクを踏む側でブラウザが異なるため」と明記。そのため招待リンクは
+  `?code=`ではなく`#access_token=...&type=invite`のハッシュフラグメント形式になる。
+  `set-password.tsx`はブラウザ用クライアントの`detectSessionInUrl`（デフォルトtrue）が
+  どちらの形式も自動検出する前提で実装しており、専用のサーバー側コールバックルートは
+  作っていない
+- **スキャフォールドのプレースホルダー`src/routes/index.tsx`（「Welcome to TanStack Start」）を
+  削除した。** 理由: 新設した`src/routes/_authed.index.tsx`（ログイン後の仮ホーム画面）も
+  URL `/`を指すため、両方存在するとルート定義が衝突する。ダッシュボード本体はPhase 7で
+  `_authed.index.tsx`の中身を差し替える
+- **`src/routes/_authed.index.tsx`はPhase 7の本実装が入るまでの仮ページとして意図的に追加した
+  （プランのPhase 4スコープ文には無いファイル）。** 理由: `_authed`ガードの下に子ルートが
+  1つも無いと、ログイン成功後の画面遷移をブラウザで実際に確認する手段が無く、
+  「フロントエンドの変更はブラウザで動作確認してから完了とする」という開発方針を
+  満たせなかった。中身は次回Phase 7で丸ごと置き換える前提の最小限の実装（メールアドレス表示＋
+  ログアウトボタンのみ）
+
 ---
 
 ## 次にやること
 
-**Phase 2（DB とマイグレーション）— 完了。**
+**Phase 4（認証）— 完了。**
 
-- ~~マイグレーション4本の作成~~ — **完成済み**
-- ~~開発用プロジェクトへの適用~~ — **完成済み**
-- ~~RLS の統合テストを書く~~ — **完成済み・5件全て成功**
-   - `supabase/tests/rls.test.ts` ＋ `supabase/tests/support/{env,test-clients,load-secret-env}.ts`
-   - `vitest.rls.config.ts` を別設定として分離（`npm test` には含めない）
-   - 実行コマンド: `npm run test:rls`（要 `scripts/.env` の `SUPABASE_SECRET_KEY`、開発用のみ）
-   - 検証内容5件、全成功: ①Aは自分の車両のみ取得・Bからは空 ②AがUPDATEで
-     `user_id`をBに書き換えられない(WITH CHECK) ③Aが自分のuser_id＋Bのvehicle_idで
-     記録を挿入できない(複合FK) ④匿名ロールは両テーブルとも拒否 ⑤車両削除で
-     記録がカスケード削除される
-- ~~`database.types.ts` を生成~~ — **完成済み**
-- ~~本番用プロジェクトへの適用~~ — **完成済み**（一時停止からの再開を挟んで実行。
-  `vehicles`・`maintenance_records`テーブルの作成を依頼者が確認済み）
+- ~~Supabase クライアント（サーバー用・ブラウザ用）の実装~~ — **完成済み**
+- ~~login/set-password 画面~~ — **完成済み**
+- ~~`_authed` ルートガード~~ — **完成済み**（ブラウザでログイン→仮ホーム→ログアウトの
+  一連の流れを実際に確認済み）
+- ~~招待スクリプト~~ — **完成済み**（`scripts/invite-user.ts`。Claude は未実行、
+  依頼者が実際に招待したいタイミングで自分で実行する）
 
-**次は Phase 4（認証）に着手する**:
-Supabase クライアント（サーバー用・ブラウザ用）の実装、login/set-password 画面、
-`_authed` ルートガード、招待スクリプト（`scripts/.env` の secret key を使う）。
+**次は Phase 5（車両 CRUD）に着手する**:
+`features/vehicles/server/(list,get,create,update,delete)` と関連ルート
+（`_authed.vehicles.{index,new}.tsx`、`_authed.vehicles.$vehicleId.*`）。
+車検満了日が任意であること（250cc 以下のバイクは車検なし）を UI で自然に扱う。
+`src/routes/_authed.index.tsx` は Phase 4 で作った仮のログイン後ページなので、
+本来のダッシュボード実装（Phase 7）まではこのまま残しておいてよい
+（Phase 5 では車両一覧の画面自体は増えるが、`/` の中身はまだ差し替えない）。
 実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
 先に読み直してから着手すること。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 205 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 223 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
+**中断時点**: Phase 4 完了。Phase 5（車両 CRUD）に未着手。
+まだ未コミットの変更（`src/integrations/`・`src/lib/supabase/env*`・`src/features/auth/*`・
+`src/routes/{_authed*,login,set-password}.tsx`・`scripts/invite-user.ts`・
+`eslint.config.js`・`docs/`・`.claude/launch.json` など）があるので、
+コミットするかどうか依頼者に確認する。
 **中断時点**: Phase 2 完了。Phase 4（認証）に未着手。
 まだ未コミットの変更（`supabase/`・`docs/supabase/`・`vitest.rls.config.ts`・
 `package.json`・`docs/setup-supabase.md`）があるので、コミットするかどうか依頼者に確認する。
@@ -295,7 +375,7 @@ Supabase クライアント（サーバー用・ブラウザ用）の実装、lo
 - [~] Phase 1 — 骨組み（スキャフォールド✅ / vite・wrangler✅ / vitest✅ / eslint ルール✅ / 専用エージェント未）
 - [x] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト + 型生成 + 本番適用）
 - [x] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **全完成（date/shaken/vehicles/maintenance/dashboard/auth）**
-- [ ] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト）
+- [x] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト。ブラウザで動作確認済み）
 - [ ] Phase 5 — 車両 CRUD
 - [ ] Phase 6 — 整備記録 CRUD
 - [ ] Phase 7 — ダッシュボードと車検アラート

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.tsx</h1>
+    <div class="doc-path">src/routes/_authed.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ログイン必須のページをまとめる TanStack Router の「レイアウトルート」です。
+      ファイル名の先頭の <code>_</code> は、URL には一切現れない特殊なルートである
+      ことを表す TanStack Router の命名規約。将来 <code>routes/_authed.vehicles.tsx</code>
+      のような子ルートを追加すると、URL は <code>/vehicles</code> のままで、
+      このファイルの <code>beforeLoad</code> だけを必ず通過するようになります。
+    </p>
+    <p>
+      認証ガードそのもののロジックは持たず、「セッションを取得する」
+      （<code>getSessionFn</code>）と「取得結果に応じて処理を分岐する」
+      （<code>requireUser</code>）という、すでに個別にテスト済みの2つの部品を
+      1行でつなぐだけの薄いファイルです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td><code>/_authed</code> レイアウトルートの定義</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const Route = createFileRoute('/_authed')({
+  beforeLoad: async ({ location }) => {
+    const user = await getSessionFn()
+    return { user: requireUser(user, location.href) }
+  },
+  component: () => &lt;Outlet /&gt;,
+})</code></pre>
+      <p>
+        <code>beforeLoad</code> は、このレイアウトの配下にあるどのページへ
+        遷移するときも必ず最初に実行されます。<code>getSessionFn()</code> で
+        現在のログイン状態を取得し、<code>requireUser()</code> に渡します。
+        ユーザーがいなければ <code>requireUser</code> が
+        <code>/login</code> へのリダイレクトを投げ、この <code>beforeLoad</code>
+        の実行はそこで打ち切られます（レンダリングまで到達しません）。
+      </p>
+      <p>
+        <code>location.href</code>（現在アクセスしようとしていた URL）を
+        <code>requireUser</code> に渡しているのは、ログイン画面の
+        <code>?redirect=</code> クエリに使うためです。未ログインで
+        <code>/vehicles/xxx</code> を直接開こうとした場合、ログイン成功後に
+        ダッシュボードではなく <code>/vehicles/xxx</code> へ戻せます。
+      </p>
+      <p>
+        <code>beforeLoad</code> が返す <code>{ user }</code> は、この配下の
+        全ルートの <code>context</code> に合流します。<code>_authed.index.tsx</code>
+        が <code>Route.useRouteContext()</code> で <code>user</code> を
+        取り出せるのはこのためです。
+      </p>
+      <p>
+        <code>component: () => &lt;Outlet /&gt;</code> は、それ自体は何も
+        描画せず、子ルート（<code>_authed.index.tsx</code> など）の内容を
+        そのまま表示するだけの器です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.tsx
+  </footer>
+
+</div>
+</body>
+</html>

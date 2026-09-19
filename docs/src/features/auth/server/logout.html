@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>logout.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>logout.ts</h1>
+    <div class="doc-path">src/features/auth/server/logout.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ログアウトするサーバー関数です。<code>login.ts</code> と対になる、
+      このファイル群の中で最も単純なものです。入力を持たないため Zod 検証もなく、
+      <code>supabase.auth.signOut()</code> を呼ぶだけです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>logoutHandler</code></td><td>function（export）</td><td>依存を注入できる実処理本体</td></tr>
+        <tr><td><code>logoutFn</code></td><td>const（export）</td><td><code>createServerFn</code> で包んだサーバー関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function logoutHandler(deps: LogoutDeps): Promise&lt;void&gt; {
+  await deps.supabase.auth.signOut()
+}
+
+export const logoutFn = createServerFn({ method: 'POST' }).handler(() =&gt;
+  logoutHandler({ supabase: createSupabaseServerClient() }),
+)</code></pre>
+      <p>
+        <code>signOut()</code> 呼び出し中に、サーバー用クライアントの
+        <code>cookies.setAll</code> が自動的にセッション Cookie を削除します。
+        <code>login.ts</code> と同じ理由で、Cookie 操作をこのファイルが
+        直接意識する必要はありません。
+      </p>
+      <p>
+        <code>deps</code> が必須なのも <code>get-session.ts</code> と同じ
+        import-protection 対策です。<code>createSupabaseServerClient()</code> は
+        <code>.handler()</code> コールバックの中だけで呼んでいます。
+      </p>
+      <p>
+        テストは <code>logoutHandler</code> に対して、渡した
+        <code>signOut</code> のフェイクが1回呼ばれることだけを確認しています。
+        戻り値や分岐が無い関数なので、これで十分な検証です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/auth/server/logout.ts
+  </footer>
+
+</div>
+</body>
+</html>

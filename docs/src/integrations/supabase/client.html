@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>client.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>client.ts</h1>
+    <div class="doc-path">src/integrations/supabase/client.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ブラウザ（クライアントサイド）で使う Supabase クライアントを作る、唯一の場所です。
+      <code>@supabase/ssr</code> の <code>createBrowserClient</code> を、モジュールスコープの
+      変数でシングルトンとしてキャッシュして返します。
+    </p>
+    <p>
+      <code>src/lib/supabase/</code> ではなく <code>src/integrations/supabase/</code> に
+      置いているのは、<code>src/**/lib/**</code> に適用される ESLint の境界ルール
+      （React・TanStack・Supabase の import 禁止）と、このファイルが
+      <code>@supabase/ssr</code> を import する必要があることが両立しないためです。
+      「外部 SDK をこのアプリに配線する」層として、TanStack Start の作例にならい
+      <code>integrations/</code> を新設しました。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>getSupabaseBrowserClient</code></td><td>function（export）</td><td>ブラウザ用 Supabase クライアントのシングルトンを返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>let browserClient: ReturnType&lt;typeof createBrowserClient&lt;Database&gt;&gt; | undefined
+
+export function getSupabaseBrowserClient() {
+  if (!browserClient) {
+    const env = getSupabaseEnv()
+    browserClient = createBrowserClient&lt;Database&gt;(env.url, env.publishableKey)
+  }
+  return browserClient
+}</code></pre>
+      <p>
+        初回呼び出し時だけ <code>createBrowserClient</code> を実行し、以降は
+        モジュールスコープに保持した同じインスタンスを返します。
+        <code>Database</code>（生成済みの <code>database.types.ts</code>）を型引数に渡すことで、
+        <code>.from('vehicles')</code> のようなクエリがテーブル名・カラム名まで
+        型チェックされるようになります。
+      </p>
+      <p>
+        <strong>なぜサーバー用（<code>server.ts</code>）と違ってシングルトンにしてよいか。</strong>
+        ブラウザの1つのタブ・1つのモジュールインスタンスは、常に1人の利用者に
+        紐づきます。サーバー用クライアントをメモ化してはいけない理由
+        （Cloudflare Workers の isolate 再利用で他人のセッションを掴む）は、
+        ブラウザには存在しません。むしろ、リクエストのたびに新しいクライアントを
+        作ると Supabase の内部状態（auth のイベントリスナーなど）が無駄に
+        重複するため、シングルトンが正しい選択です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/integrations/supabase/client.ts
+  </footer>
+
+</div>
+</body>
+</html>

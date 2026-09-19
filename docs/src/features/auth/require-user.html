@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>require-user.ts</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>require-user.ts</h1>
+    <div class="doc-path">src/features/auth/require-user.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ルートの <code>beforeLoad</code> から呼び出し、「ログイン済みユーザーがいなければ
+      <code>/login</code> へリダイレクトする」という分岐だけを担当するヘルパーです。
+      「現在のセッションを取得する」処理（<code>server/get-session.ts</code>、DB へ問い合わせる）と
+      「取得結果に応じてどう振る舞うか」（このファイル、分岐だけ）を分離しているため、
+      DB もルーターの実インスタンスも無しに、この分岐ロジック単体をテストできます。
+    </p>
+    <p>
+      <strong>これはあくまで UX のためのガードであり、セキュリティ境界ではない。</strong>
+      本当の安全境界は Supabase の RLS（<code>auth.uid() = user_id</code>）。
+      ここを迂回して直接サーバー関数やルートへリクエストされても、
+      RLS が他人のデータへのアクセスをデータベース側で拒む。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AuthedUser</code></td><td>interface（export）</td><td>ログイン済みユーザーの最小限の形（id・email）</td></tr>
+        <tr><td><code>requireUser</code></td><td>function（export）</td><td>ユーザーが null ならリダイレクトを投げ、いればそのまま返す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export function requireUser(user: AuthedUser | null, redirectTo: string): AuthedUser {
+  if (!user) {
+    throw redirect({ to: '/login', search: { redirect: redirectTo } })
+  }
+  return user
+}</code></pre>
+      <p>
+        <code>user</code> が <code>null</code>（未ログイン）なら、TanStack Router の
+        <code>redirect()</code> が返す「リダイレクトを表す特別な Response」を
+        <code>throw</code> します。TanStack Router はルートの <code>beforeLoad</code> 内で
+        投げられたこの特別な例外を検知して、実際のブラウザナビゲーションに変換します。
+      </p>
+      <p>
+        <code>search: { redirect: redirectTo }</code> でログイン後に戻るべき URL を
+        クエリパラメータとして持たせています。<code>/login</code> 画面はログイン成功時に
+        この値を読み、ダッシュボードではなく元々アクセスしようとしていたページへ
+        利用者を送り返せます（例: <code>/vehicles/xxx</code> を開こうとして
+        未ログインだった場合、ログイン後は <code>/vehicles/xxx</code> に戻る）。
+      </p>
+      <p>
+        <code>user</code> があればそのまま返します。戻り値の型が
+        <code>AuthedUser</code>（<code>| null</code> を含まない）であることにより、
+        呼び出し側はこれ以降 <code>null</code> チェックを書かずにユーザー情報を扱えます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/auth/require-user.ts
+  </footer>
+
+</div>
+</body>
+</html>

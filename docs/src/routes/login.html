@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>login.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>login.tsx</h1>
+    <div class="doc-path">src/routes/login.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      メールアドレスとパスワードを入力してログインするページです。
+      <code>/_authed</code> ガード（<code>requireUser</code>）に弾かれた
+      未ログインの利用者が最終的に辿り着く場所でもあります。
+    </p>
+    <p>
+      検証は2段階になっています。まずブラウザ側で <code>loginSchema</code>
+      （Zod）を使って即座にフィードバックを返し、サーバーへは送りません。
+      通過したら <code>loginFn</code>（サーバー関数）を呼びますが、
+      その入り口でも同じ <code>loginSchema</code> が再度検証します
+      （CLAUDE.md の方針「全書き込みはサーバー関数の入口で Zod 検証する」）。
+      クライアント側の検証はあくまで UX のためのショートカットで、
+      安全境界はサーバー関数側の検証です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>loginSearchSchema</code></td><td>const</td><td>URL クエリ <code>?redirect=</code> を検証する Zod スキーマ</td></tr>
+        <tr><td><code>Route</code></td><td>const（export）</td><td><code>/login</code> ルートの定義</td></tr>
+        <tr><td><code>LoginPage</code></td><td>function（component）</td><td>フォームの状態管理と送信処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const loginSearchSchema = z.object({
+  redirect: z.string().optional(),
+})
+
+export const Route = createFileRoute('/login')({
+  validateSearch: loginSearchSchema,
+  component: LoginPage,
+})</code></pre>
+      <p>
+        <code>validateSearch</code> により、このルートの URL クエリパラメータが
+        型安全になります。<code>_authed.tsx</code> の <code>requireUser</code> が
+        投げるリダイレクトの <code>search: { redirect: redirectTo }</code> を
+        受け取るための宣言です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const parsed = loginSchema.safeParse({ email, password })
+if (!parsed.success) {
+  setError(parsed.error.issues[0]?.message ?? '入力内容を確認してください')
+  return
+}
+
+setError(null)
+setSubmitting(true)
+try {
+  const result = await loginFn({ data: parsed.data })
+  if (!result.success) {
+    setError(result.error)
+    return
+  }
+  await navigate({ href: redirect ?? '/', replace: true })
+} finally {
+  setSubmitting(false)
+}</code></pre>
+      <p>
+        <code>loginSchema</code> は <code>features/auth/lib/login-schema.ts</code>
+        （純粋関数）と共有しています。同じ検証ルールをクライアントとサーバーの
+        両方に実装し直すのではなく、1つのスキーマを両側から呼ぶことで
+        ズレを防いでいます。
+      </p>
+      <p>
+        <code>navigate({ href: redirect ?? '/', ... })</code> で
+        <code>to</code> ではなく <code>href</code> を使っているのは、
+        <code>redirect</code> が「型システムが知っているルート一覧のどれか」
+        ではなく、実行時に決まる任意の文字列だからです。<code>href</code> は
+        TanStack Router が型安全性を諦めて任意の文字列パスへ遷移するための
+        エスケープハッチとして用意しているオプションです。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/login.tsx
+  </footer>
+
+</div>
+</body>
+</html>

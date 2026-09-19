@@ -59,6 +59,7 @@ export default [
       'eslint.config.js',
       'prettier.config.js',
       'src/routeTree.gen.ts',
+      'src/lib/supabase/database.types.ts',
       'dist/**',
       'coverage/**',
       '.wrangler/**',

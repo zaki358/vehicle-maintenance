@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>get-session.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>get-session.ts</h1>
+    <div class="doc-path">src/features/auth/server/get-session.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      「今、誰がログインしているか」を返すサーバー関数です。ルートの
+      <code>beforeLoad</code>（<code>_authed.tsx</code>）から呼ばれ、その結果を
+      <code>require-user.ts</code> の <code>requireUser()</code> に渡して
+      ログインガードを構成します。
+    </p>
+    <p>
+      <code>getSession()</code> ではなく <code>getClaims()</code> を使っているのが
+      この実装の要点です。<code>getSession()</code> は Cookie に入っている値を
+      そのまま返すだけで、サーバー側では署名を検証しません。一方
+      <code>getClaims()</code> は JWT の署名を WebCrypto でその場で検証するため、
+      改ざんされた Cookie を信頼してしまう心配がなく、しかもネットワーク往復も発生しません。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>getSessionHandler</code></td><td>function（export）</td><td>依存を注入できる実処理本体。ユニットテストはこちらを直接呼ぶ</td></tr>
+        <tr><td><code>getSessionFn</code></td><td>const（export）</td><td><code>createServerFn</code> で包んだ、ルート/クライアントから呼べる形</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function getSessionHandler(deps: GetSessionDeps): Promise&lt;AuthedUser | null&gt; {
+  const { data, error } = await deps.supabase.auth.getClaims()
+  if (error || !data) {
+    return null
+  }
+  return { id: data.claims.sub, email: data.claims.email ?? null }
+}
+
+export const getSessionFn = createServerFn({ method: 'GET' }).handler(() =&gt;
+  getSessionHandler({ supabase: createSupabaseServerClient() }),
+)</code></pre>
+      <p>
+        実処理を <code>getSessionHandler</code> という単独の関数として切り出し、
+        Supabase クライアントを <code>deps</code> 引数で受け取る形にしています。
+        テストからは <code>auth.getClaims</code> だけを持つ最小限のフェイクを
+        直接渡せます。これにより、実際の Supabase ネットワーク通信を一切発生させずに
+        「クレームが取れた／エラーだった／未ログインだった」の3パターンを検証できます。
+      </p>
+      <p>
+        <code>error || !data</code> の条件は、<code>getClaims()</code> の戻り値の型が
+        3パターン（成功／エラー／「エラーは無いがデータも無い」＝単純な未ログイン）
+        存在することに対応しています。いずれの場合も呼び出し側からは同じ
+        <code>null</code> として扱えるようにしています。
+      </p>
+      <p>
+        <strong><code>deps</code> にデフォルト値を持たせていない理由。</strong>
+        当初は <code>deps: GetSessionDeps = { supabase: createSupabaseServerClient() }</code>
+        という書き方にしていましたが、これだと TanStack Start のビルドが
+        「サーバー専用 import をクライアント環境に混入させるな」という
+        import-protection エラーで失敗しました。<code>_authed.tsx</code>
+        （クライアントにもバンドルされるルートファイル）が
+        <code>getSessionFn</code> を使うために <code>get-session.ts</code> を
+        import すると、デフォルト値として書かれた
+        <code>createSupabaseServerClient</code>（<code>@tanstack/react-start/server</code>
+        に依存）への参照が、モジュールのトップレベルから静的に見えてしまうためです。
+        <code>deps</code> を必須にし、<code>createSupabaseServerClient()</code> の呼び出しを
+        <code>getSessionFn</code> の <code>.handler()</code> コールバックの中だけに
+        押し込めることで、クライアントバンドル生成時にこの部分だけを安全に
+        除外できるようになりました。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>interface GetSessionDeps {
+  supabase: { auth: Pick&lt;SupabaseClient&lt;Database&gt;['auth'], 'getClaims'&gt; }
+}</code></pre>
+      <p>
+        依存の型は「<code>SupabaseAuthClient</code> 全体」ではなく、実際に使う
+        <code>getClaims</code> メソッド1つだけを <code>Pick</code> で取り出しています。
+        こうしないと、テスト用のフェイクオブジェクトは
+        <code>SupabaseAuthClient</code> が持つ100件以上のメソッド・プロパティを
+        すべて実装しなければコンパイルが通らなくなってしまいます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const getSessionFn = createServerFn({ method: 'GET' }).handler(() => getSessionHandler())</code></pre>
+      <p>
+        <code>createServerFn</code> でラップした薄い配線です。テストはこちらを
+        通しません（TanStack Start のサーバー関数呼び出し機構そのものは
+        ユニットテストの対象外で、E2E やブラウザでの手動確認で検証する層）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/auth/server/get-session.ts
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>login.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>login.ts</h1>
+    <div class="doc-path">src/features/auth/server/login.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      メールアドレスとパスワードでログインするサーバー関数です。
+      <code>loginSchema</code>（Zod）で入力を検証してから Supabase の
+      <code>signInWithPassword</code> を呼び、失敗時は <code>auth-errors.ts</code>
+      の <code>authErrorMessage</code> で日本語のメッセージに変換して返します。
+    </p>
+    <p>
+      Cookie への書き込みはこのファイルの責務ではありません。
+      <code>createSupabaseServerClient()</code> が組み立てるクライアントは
+      <code>cookies.setAll</code> を持っているため、<code>signInWithPassword</code>
+      の呼び出し中に Supabase 側が自動的にセッション Cookie を書き込みます。
+      このファイルはログインの成否だけを気にすればよい設計です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>LoginResult</code></td><td>type（export）</td><td>成功 <code>{ success: true }</code> か、失敗 <code>{ success: false, error }</code> の判別可能な union</td></tr>
+        <tr><td><code>loginHandler</code></td><td>function（export）</td><td>依存を注入できる実処理本体</td></tr>
+        <tr><td><code>loginFn</code></td><td>const（export）</td><td><code>createServerFn</code> で包み、Zod 検証を挟んだサーバー関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function loginHandler(input: LoginInput, deps: LoginDeps): Promise&lt;LoginResult&gt; {
+  const { error } = await deps.supabase.auth.signInWithPassword(input)
+  if (error) {
+    return { success: false, error: authErrorMessage({ code: error.code, message: error.message }) }
+  }
+  return { success: true }
+}</code></pre>
+      <p>
+        <code>deps</code> は必須引数で、デフォルト値を持ちません。理由は
+        <code>get-session.ts</code> と同じ import-protection 対策です
+        （<code>createSupabaseServerClient()</code> の呼び出しは、下の
+        <code>loginFn</code> の <code>.handler()</code> コールバックの中だけに
+        押し込めています）。</p>
+      <p>
+        <code>get-session.ts</code> と同じ「<code>deps</code> 注入で依存を差し替え可能にする」
+        パターンです。<code>authErrorMessage</code> は
+        <code>@supabase/*</code> を import しない純粋関数（<code>lib/</code> 層）なので、
+        Supabase の <code>AuthError</code> をそのまま渡さず
+        <code>{ code, message }</code> の最小限の形に変換して渡しています。
+      </p>
+      <p>
+        <code>invalid_credentials</code> と <code>user_not_found</code> を
+        <code>authErrorMessage</code> 側で同じ文言にまとめているのは、
+        「そのメールアドレスは登録されていません」と個別に出し分けると
+        第三者が招待済みメールアドレスを詮索できてしまうため
+        （ユーザー列挙対策。公開サインアップを無効化している設計と対をなす）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const loginFn = createServerFn({ method: 'POST' })
+  .validator(loginSchema)
+  .handler(({ data }) => loginHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        <code>.validator(loginSchema)</code> に Zod スキーマをそのまま渡せます。
+        Zod 4 はスキーマが Standard Schema
+        （<code>~standard</code> プロパティを持つ共通インターフェース）を実装しているため、
+        TanStack Start 側で追加の変換コードを書く必要がありません。
+        ここが「全書き込みはサーバー関数の入口で Zod 検証する」という
+        プロジェクトの方針の実体です — クライアント側のフォームバリデーションを
+        経由せず直接この関数が叩かれても、不正な入力はここで弾かれます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/auth/server/login.ts
+  </footer>
+
+</div>
+</body>
+</html>

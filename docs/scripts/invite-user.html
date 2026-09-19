@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>invite-user.ts</title>
+<link rel="stylesheet" href="../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>invite-user.ts</h1>
+    <div class="doc-path">scripts/invite-user.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      公開サインアップを無効化しているこのアプリで、新しい利用者にアカウントを
+      使ってもらうための唯一の手段——オーナーが自分の PC のターミナルで直接実行する、
+      招待専用のスクリプトです。<code>src/</code> 配下のアプリケーションコードとは
+      独立していて、Cloudflare Workers にはデプロイされません。
+    </p>
+    <p>
+      <strong>Claude はこのスクリプトを実行しません。</strong>
+      実行には <code>SUPABASE_SECRET_KEY</code>（service_role 相当の強力な権限を持つ
+      シークレットキー）が必要で、これはプロジェクトの方針上 Claude が扱わない値
+      だからです。<code>scripts/.env</code>（.gitignore 対象）にこの値を置き、
+      オーナー自身が <code>node scripts/invite-user.ts &lt;メールアドレス&gt;</code>
+      を実行します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>loadEnvFiles</code></td><td>function</td><td><code>.env</code> と <code>scripts/.env</code> を読み込む</td></tr>
+        <tr><td><code>requireEnv</code></td><td>function</td><td>環境変数を読み、無ければ分かりやすいメッセージで例外を投げる</td></tr>
+        <tr><td><code>main</code></td><td>function</td><td>引数を解釈し、招待メールを送信する本体</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const email = process.argv[2]
+if (!email) {
+  console.error('使い方: node scripts/invite-user.ts &lt;招待するメールアドレス&gt; [招待後の遷移先URL]')
+  process.exitCode = 1
+  return
+}</code></pre>
+      <p>
+        このプロジェクトにはビルドツールを追加していないため、
+        <code>tsx</code> のような別ツールを入れず、Node.js が標準で持つ
+        TypeScript ファイルの直接実行機能（Node 22 以降）で
+        <code>node scripts/invite-user.ts ...</code> とそのまま実行できるようにしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const projectLabel = supabaseUrl.includes(PRODUCTION_HOST) ? '本番' : '開発用'
+console.log(`招待先プロジェクト: ${projectLabel}（${supabaseUrl}）`)</code></pre>
+      <p>
+        招待メールは実際に送信される、取り消しの効かない操作です。誤って
+        開発用プロジェクトに向けて実行してしまう（あるいはその逆）事故を防ぐため、
+        実行前に「今どちらのプロジェクトに向けて送ろうとしているか」を
+        必ず画面に表示します。<code>scripts/tests/support/env.ts</code>
+        （RLS 統合テスト）が本番プロジェクトへの実行を例外で強制的に止めるのに対し、
+        こちらは意図的にブロックしません — 招待は最終的に本番プロジェクトへ
+        送ることが目的の操作であるため、止めるのではなく「見える化」する設計です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo })</code></pre>
+      <p>
+        <code>supabase.auth.admin.inviteUserByEmail()</code> は PKCE に対応していません
+        （招待する側＝オーナーのブラウザと、リンクを踏む側＝招待された利用者の
+        ブラウザが異なるため、同一ブラウザ内でのコード検証を前提とする PKCE の
+        安全性を担保できないと Supabase 公式ドキュメントが明記しています）。
+        そのため招待メールのリンクは <code>#access_token=...&amp;type=invite</code>
+        というハッシュフラグメント形式になり、<code>routes/set-password.tsx</code>
+        のブラウザ用クライアントがこれを自動検出してセッションを確立します。
+      </p>
+      <p>
+        <code>redirectTo</code> は Supabase ダッシュボードの
+        <strong>Authentication → URL Configuration → Redirect URLs</strong>
+        に事前に登録されている URL でなければ、リンクを踏んでもそこへ遷移しません。
+        このスクリプトはその設定を確認する手段を持たないため、実行前に
+        コンソールへ遷移先 URL を出力し、オーナー自身がダッシュボードの設定と
+        見比べられるようにしています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: scripts/invite-user.ts
+  </footer>
+
+</div>
+</body>
+</html>
