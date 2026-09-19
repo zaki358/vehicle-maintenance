@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>update.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>update.ts</h1>
+    <div class="doc-path">src/features/vehicles/server/update.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両を更新するサーバー関数です。<code>routes/_authed.vehicles.$vehicleId.edit.tsx</code>
+      の編集フォームから呼ばれます。<code>vehicleIdSchema</code>（どの車両か）と
+      <code>vehicleSchema</code>（何に変えるか）を合成した専用のスキーマで
+      入力全体を検証します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>updateVehicleSchema</code></td><td>const</td><td><code>vehicleIdSchema</code> と <code>vehicleSchema</code> を合成した検証スキーマ</td></tr>
+        <tr><td><code>UpdateVehicleInput</code></td><td>type（export）</td><td><code>updateVehicleSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>updateVehicleHandler</code></td><td>async function（export）</td><td>DBへのupdateの実処理</td></tr>
+        <tr><td><code>updateVehicleFn</code></td><td>const（export）</td><td>実際に呼ぶサーバー関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const updateVehicleSchema = vehicleIdSchema.extend(vehicleSchema.shape)</code></pre>
+      <p>
+        Zod の <code>.extend()</code> で2つの既存スキーマの項目をまとめています。
+        「どの行を」（<code>id</code>）と「何に変えるか」（<code>vehicleSchema</code> の4項目）
+        を1つのスキーマに合成することで、更新に必要な入力全体を一箇所で検証できます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function updateVehicleHandler(
+  input: UpdateVehicleInput,
+  deps: UpdateVehicleDeps,
+): Promise&lt;VehicleRow | null&gt; {
+  const { data, error } = await deps.supabase
+    .from('vehicles')
+    .update({
+      name: input.name,
+      vehicle_type: input.vehicleType,
+      shaken_expiry_date: input.shakenExpiryDate,
+      note: input.note,
+    })
+    .eq('id', input.id)
+    .select()
+    .maybeSingle()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>get.ts</code> と同じ理由で <code>.maybeSingle()</code> を使い、
+        「存在しない・他人の車両」を <code>null</code> として返しています
+        （<code>vehicles_update_own</code> ポリシーの <code>USING</code> 句が
+        他人の行を対象から除外するため、0件で返ってくる）。
+        <code>id</code> 自体は更新対象に含めていません（更新後もキーは変わらない）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const updateVehicleFn = createServerFn({ method: 'POST' })
+  .validator(updateVehicleSchema)
+  .handler(({ data }) => updateVehicleHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        他のサーバー関数と同じ構造です。<code>createSupabaseServerClient()</code>
+        の呼び出しは <code>.handler()</code> の中だけに置いています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/server/update.ts
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>create.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>create.ts</h1>
+    <div class="doc-path">src/features/vehicles/server/create.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両を新規作成するサーバー関数です。<code>routes/_authed.vehicles.new.tsx</code>
+      の登録フォームから呼ばれます。フォーム入力（キャメルケース）をDBの列名
+      （スネークケース）へ詰め替える変換もこのファイルの責務です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>createVehicleHandler</code></td><td>async function（export）</td><td>DBへのinsertの実処理</td></tr>
+        <tr><td><code>createVehicleFn</code></td><td>const（export）</td><td><code>vehicleSchema</code> で検証したうえで呼ぶ、実際のサーバー関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function createVehicleHandler(input: VehicleInput, deps: CreateVehicleDeps): Promise&lt;VehicleRow&gt; {
+  const { data, error } = await deps.supabase
+    .from('vehicles')
+    .insert({
+      name: input.name,
+      vehicle_type: input.vehicleType,
+      shaken_expiry_date: input.shakenExpiryDate,
+      note: input.note,
+    })
+    .select()
+    .single()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>insert</code> するオブジェクトに <code>user_id</code> を含めていないのが
+        意図的な設計です。<code>vehicles.user_id</code> は
+        マイグレーションで <code>default auth.uid()</code> になっているため、
+        クライアントが <code>user_id</code> を指定できる余地そのものを無くしています
+        （もし指定できてしまうと、他人の <code>user_id</code> を詐称して
+        なりすまし登録される脆弱性になり得ます）。<code>.insert(...).select().single()</code>
+        は「挿入した行をそのまま返す」ためのPostgRESTの定番の書き方です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const createVehicleFn = createServerFn({ method: 'POST' })
+  .validator(vehicleSchema)
+  .handler(({ data }) => createVehicleHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        「全書き込みはサーバー関数の入口で Zod 検証する」という
+        プロジェクト方針どおり、フォームの生入力を <code>vehicleSchema</code>
+        （<code>vehicle-schema.ts</code>）でもう一度検証してから DB に渡します。
+        クライアント側の検証（<code>vehicle-form.tsx</code>）はUXのためであり、
+        ここでの検証が実際のセキュリティ境界です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/server/create.ts
+  </footer>
+
+</div>
+</body>
+</html>

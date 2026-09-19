@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.index.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.index.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.index.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両一覧ページです。URL は <code>/vehicles</code>（ファイル名の
+      <code>.index</code> は「親ルート自身のパスにマッチする」という
+      TanStack Router の規約）。ログイン中ユーザーの車両を一覧表示し、
+      新規登録ページと各車両の詳細ページへのリンクを出します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td><code>/vehicles</code> ルートの定義</td></tr>
+        <tr><td><code>VehiclesIndexPage</code></td><td>function（component）</td><td>一覧の描画</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const Route = createFileRoute('/_authed/vehicles/')({
+  loader: () => listVehiclesFn(),
+  component: VehiclesIndexPage,
+})</code></pre>
+      <p>
+        <code>loader</code> でデータ取得を宣言しておくと、TanStack Router は
+        ナビゲーション中（画面遷移のアニメーションやコード分割の読み込みと
+        並行して）にこれを実行します。コンポーネントが実際に描画される時点では
+        <code>listVehiclesFn()</code> がすでに完了しているため、
+        「ローディング中はスピナーを出して、終わったら描画する」という
+        よくある2段階の書き方をせずに済みます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const vehicles = Route.useLoaderData()</code></pre>
+      <p>
+        <code>loader</code> が返した値を型安全に取り出します。戻り値の型は
+        <code>listVehiclesFn</code>（延いては <code>listVehiclesHandler</code>）から
+        自動的に推論されます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}&gt;
+  {vehicle.name}（{vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}）
+&lt;/Link&gt;</code></pre>
+      <p>
+        <code>vehicle.vehicle_type</code> は DB の行の型では単なる
+        <code>string</code>（Supabase の型生成はテーブルの CHECK 制約までは
+        読み取らない）なので、<code>VehicleType</code>（<code>'car' | 'motorcycle'</code>）へ
+        キャストしています。これは外部から届いた値ではなく、自分たちが書いた
+        CHECK 制約付きの自テーブルからの読み取りであるため許容しています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.index.tsx
+  </footer>
+
+</div>
+</body>
+</html>

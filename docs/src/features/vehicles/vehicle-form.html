@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vehicle-form.tsx</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>vehicle-form.tsx</h1>
+    <div class="doc-path">src/features/vehicles/vehicle-form.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の新規登録（<code>routes/_authed.vehicles.new.tsx</code>）と編集
+      （<code>routes/_authed.vehicles.$vehicleId.edit.tsx</code>）の両方で共用する
+      フォームコンポーネントです。React・ルーティング・Supabase に依存するため
+      <code>lib/</code> 配下ではなく <code>features/vehicles/</code> 直下に置いています
+      （<code>eslint.config.js</code> の境界ルールにより <code>lib/</code> は
+      React import を禁止されている）。
+    </p>
+    <p>
+      2つのページで見た目と検証ロジックが完全に同じフォームを別々に実装すると
+      片方だけ直し忘れる事故が起きやすいため、1つのコンポーネントに切り出しました。
+      新規登録では <code>initialValues</code> を渡さず全項目を空欄から始め、
+      編集では現在の値を渡します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>VehicleFormResult</code></td><td>type（export）</td><td><code>onSubmit</code> が返す結果の型</td></tr>
+        <tr><td><code>VehicleForm</code></td><td>function（export・コンポーネント）</td><td>車両の登録・編集フォーム本体</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>interface VehicleFormProps {
+  initialValues?: VehicleInput
+  submitLabel: string
+  onSubmit: (input: VehicleInput) => Promise&lt;VehicleFormResult&gt;
+}</code></pre>
+      <p>
+        フォーム自身は「検証済みの入力を <code>onSubmit</code> に渡す」ところまでが
+        責務で、実際にサーバー関数（<code>createVehicleFn</code> / <code>updateVehicleFn</code>）
+        を呼ぶのは呼び出し元のルートファイルです。これにより、このコンポーネントは
+        「新規登録なのか編集なのか」を一切知らずに済みます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const [shakenExpiryDate, setShakenExpiryDate] = useState(initialValues?.shakenExpiryDate ?? '')</code></pre>
+      <p>
+        車検満了日は「250cc以下のバイクなど、そもそも車検制度の対象外」という
+        車両があるため任意入力です。<code>&lt;input type="date"&gt;</code> は
+        未入力だと空文字列を返しますが、<code>vehicleSchema</code> の
+        <code>shakenExpiryDate</code> は「実在する日付文字列 or <code>null</code>」しか
+        受け付けません（空文字列は弾かれる）。この状態変数はUI都合の
+        <code>string</code> のまま持ち、送信時に変換します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const parsed = vehicleSchema.safeParse({
+  name,
+  vehicleType,
+  shakenExpiryDate: shakenExpiryDate === '' ? null : shakenExpiryDate,
+  note,
+})
+if (!parsed.success) {
+  setError(parsed.error.issues[0]?.message ?? '入力内容を確認してください')
+  return
+}</code></pre>
+      <p>
+        送信時に空文字列を <code>null</code> へ変換してから、<code>vehicle-schema.ts</code>
+        と全く同じ <code>vehicleSchema</code> でクライアント側の検証をします。
+        <code>login.tsx</code> と同じパターンで、最初のエラーメッセージ1件だけを
+        画面に表示するシンプルな方式です（このクライアント側検証はUXのためであり、
+        実際のセキュリティ境界はサーバー関数側の同じスキーマによる再検証です）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const result = await onSubmit(parsed.data)
+if (!result.success) {
+  setError(result.error)
+}</code></pre>
+      <p>
+        検証を通った入力（<code>DateString | null</code> に変換済みの
+        <code>VehicleInput</code>）を <code>onSubmit</code> に渡します。呼び出し元が
+        サーバー関数の呼び出しに失敗した場合は <code>{ success: false, error }</code>
+        を返す約束にしており、その場合はフォーム側でエラーメッセージを表示します。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/vehicle-form.tsx
+  </footer>
+
+</div>
+</body>
+</html>

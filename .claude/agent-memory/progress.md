@@ -3,13 +3,13 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-19(Phase 4 完了。認証まわりのブラウザ動作確認まで完了)
+最終更新: 2026-09-19(Phase 5 完了。車両CRUDのブラウザ動作確認まで完了)
 
 ---
 
 ## 現在地
 
-**Phase 1〜4 完了。次はPhase 5(車両CRUD)。**
+**Phase 1〜5 完了。次はPhase 6(整備記録CRUD)。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
@@ -182,6 +182,51 @@
 - [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`（223テスト全通過） /
       `npm run build` 全て green** — Phase 4完了
 
+### Phase 5（車両CRUD）
+
+- [x] **`src/features/vehicles/lib/vehicle-id-schema.ts` 完成** — `vehicleIdSchema`。
+      `id`がUUID形式かだけを検証する（存在確認・所有権確認はRLS/各ハンドラに委譲）。3テスト
+- [x] **`src/features/vehicles/server/{list,get,create,update,delete}.ts` 完成** —
+      このプロジェクトで初めてDBテーブル（`vehicles`）を直接操作するサーバー関数群。
+      Phase 4のauth/serverと同じ「`xxxHandler`(deps注入・純粋)＋`xxxFn`(`createServerFn`
+      ラッパー)」パターンを踏襲し、`deps.supabase`は`Pick<SupabaseClient<Database>, 'from'>`
+      で narrow化。テストは`vi.fn()`の素のオブジェクトを渡すだけで型キャスト一切不要
+      （`vi.fn()`の`any`推論により実クライアントの複雑なオーバーロード型とも自然に整合する
+      ことを確認済み）。`list`/`get`は明示的な`user_id`絞り込みを書かない
+      （RLSの`vehicles_select_own`等に委任、二重チェックでポリシーの機能を隠さない）。
+      `get`/`update`は`.maybeSingle()`を使い「存在しない」と「他人の車両(RLSブロック)」を
+      区別せず`null`を返す（情報漏洩防止）。`delete`は物理削除
+      （`maintenance_records`側の`on delete cascade`で整備記録も連鎖削除される設計）。
+      計13テスト
+- [x] **`src/features/vehicles/vehicle-form.tsx` 完成** — 新規登録・編集で共用するフォーム。
+      `<input type="date">`の空文字列を送信時に`null`へ変換してから`vehicleSchema`で検証
+      （250cc以下のバイク等、車検満了日を持たない車両を自然に扱うための変換）。
+      dom project（jsdom）でのコンポーネントテストはこのプロジェクトで初めて。5テスト
+- [x] **ルート5本完成** — `_authed.vehicles.index.tsx`(一覧)/`.new.tsx`(新規登録)/
+      `.$vehicleId.tsx`(レイアウト。`beforeLoad`で`getVehicleFn`を呼び`vehicle`を
+      route contextに積む。`_authed.tsx`が`user`を積むのと同じパターン。見つからなければ
+      `notFoundComponent`で日本語の専用画面を表示)/`.$vehicleId.index.tsx`(詳細・削除)/
+      `.$vehicleId.edit.tsx`(編集)。`routes/**`はカバレッジ対象外（E2Eで検証する方針）
+      のため単体テストは書いていない
+- [x] **`_authed.index.tsx`(Phase4の仮ホーム)に「車両一覧へ」リンクを追加** —
+      本実装はPhase 7で置き換わる前提は変わらないが、手動確認の導線として追加
+- [x] **開発用Supabaseで使い捨てテストユーザーを作成しブラウザで実動作確認** —
+      ログイン→一覧(空)→新規登録(車検満了日あり「ロードスター」)→詳細表示
+      （日本語日付表示`2027年5月1日(土)`を確認）→編集→一覧反映→新規登録
+      （車検満了日なし「カブ」→「車検対象外」表示を確認）→削除
+      （`window.confirm`はブラウザ自動化では既定でキャンセルされるため
+      `window.confirm = () => true`に一時的に上書きして確認）→一覧から消えたことを確認
+      →存在しないIDへの直接アクセスで`notFoundComponent`表示を確認。
+      テストユーザーは確認後すぐ削除済み（Phase 4と同じ使い捨て運用）
+- [x] **Phase 5全ファイル(12ファイル)の解説ドキュメント生成完了** —
+      `docs/src/features/vehicles/lib/vehicle-id-schema.html`、
+      `docs/src/features/vehicles/server/{list,get,create,update,delete}.html`、
+      `docs/src/features/vehicles/vehicle-form.html`、
+      `docs/src/routes/_authed.vehicles.{index,new,$vehicleId,$vehicleId.index,$vehicleId.edit}.html`。
+      あわせて`docs/src/routes/_authed.index.html`（Phase4作成分）もリンク追加を反映して更新
+- [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(243テスト全通過) /
+      `npm run build` 全て green** — Phase 5完了
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -268,28 +313,31 @@
 
 ## 次にやること
 
-**Phase 4（認証）— 完了。**
+**Phase 5（車両 CRUD）— 完了。**
 
-- ~~Supabase クライアント（サーバー用・ブラウザ用）の実装~~ — **完成済み**
-- ~~login/set-password 画面~~ — **完成済み**
-- ~~`_authed` ルートガード~~ — **完成済み**（ブラウザでログイン→仮ホーム→ログアウトの
-  一連の流れを実際に確認済み）
-- ~~招待スクリプト~~ — **完成済み**（`scripts/invite-user.ts`。Claude は未実行、
-  依頼者が実際に招待したいタイミングで自分で実行する）
+- ~~`features/vehicles/server/(list,get,create,update,delete)`~~ — **完成済み**
+- ~~`_authed.vehicles.{index,new}.tsx`、`_authed.vehicles.$vehicleId.*`~~ — **完成済み**
+- ~~車検満了日が任意（250cc以下は車検なし）であることをUIで扱う~~ — **完成済み**
+  （`<input type="date">`の空値を`null`に変換。「車検対象外」表示で確認済み）
+- ~~ブラウザでの動作確認~~ — **完成済み**（登録・詳細表示・編集・削除・404の一連を確認済み）
 
-**次は Phase 5（車両 CRUD）に着手する**:
-`features/vehicles/server/(list,get,create,update,delete)` と関連ルート
-（`_authed.vehicles.{index,new}.tsx`、`_authed.vehicles.$vehicleId.*`）。
-車検満了日が任意であること（250cc 以下のバイクは車検なし）を UI で自然に扱う。
-`src/routes/_authed.index.tsx` は Phase 4 で作った仮のログイン後ページなので、
-本来のダッシュボード実装（Phase 7）まではこのまま残しておいてよい
-（Phase 5 では車両一覧の画面自体は増えるが、`/` の中身はまだ差し替えない）。
+**次は Phase 6（整備記録 CRUD）に着手する**:
+`features/maintenance/*`（`lib`は既にPhase3で完成済み：`work-types`/`record-schema`/
+`filter-records`/`sort-records`/`part-suggestions`/`odometer`）に対応する
+`server/(list,create,update,delete,list-part-details)`と関連ルートを実装する。
+プリセット選択＋「その他」で自由入力欄が出る挙動、部品サジェスト（過去入力値）、
+作業内容でのフィルタ、走行距離の逆行警告（`isOdometerRegression`）をUIに反映する。
+ルートは車両詳細ページ配下（`_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`
+など、実装プランのディレクトリ構成を参照）になる見込み。
+Phase 5で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォームはfeatures/*直下に
+素のHTML+Zodで実装しlib/には置かない」「routes/**は単体テスト対象外でE2Eに委ねる」の
+3パターンをそのまま踏襲すること。
 実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
 先に読み直してから着手すること。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 223 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 243 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
 **中断時点**: Phase 4 完了。Phase 5（車両 CRUD）に未着手。
@@ -376,7 +424,7 @@
 - [x] Phase 2 — DB とマイグレーション（4 migration + RLS 統合テスト + 型生成 + 本番適用）
 - [x] Phase 3 — 純粋ロジック（TDD）`lib/date/*`, `features/*/lib/*` ← **全完成（date/shaken/vehicles/maintenance/dashboard/auth）**
 - [x] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト。ブラウザで動作確認済み）
-- [ ] Phase 5 — 車両 CRUD
+- [x] Phase 5 — 車両 CRUD（server 5本 + vehicle-form + ルート5本。ブラウザで動作確認済み）
 - [ ] Phase 6 — 整備記録 CRUD
 - [ ] Phase 7 — ダッシュボードと車検アラート
 - [ ] Phase 8 — 検証（E2E / レビュー）とデプロイ

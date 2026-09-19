@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>delete.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>delete.ts</h1>
+    <div class="doc-path">src/features/vehicles/server/delete.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両を削除するサーバー関数です。車両詳細ページの「削除」ボタンから呼ばれます。
+      物理削除（DBから行そのものを消す）で、紐づく整備記録も一緒に消えます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>deleteVehicleHandler</code></td><td>async function（export）</td><td>DBからのdeleteの実処理</td></tr>
+        <tr><td><code>deleteVehicleFn</code></td><td>const（export）</td><td>実際に呼ぶサーバー関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function deleteVehicleHandler(input: VehicleIdInput, deps: DeleteVehicleDeps): Promise&lt;void&gt; {
+  const { error } = await deps.supabase.from('vehicles').delete().eq('id', input.id)
+  if (error) {
+    throw new Error(error.message)
+  }
+}</code></pre>
+      <p>
+        削除前に「この車両は本当に自分のものか」を明示的に確認していません。
+        <code>maintenance_records</code> の <code>vehicle_id</code> 外部キーに
+        <code>on delete cascade</code> が設定されているため、この1回の削除で
+        紐づく整備記録もまとめて消えます。他人の・存在しない ID を指定しても
+        <code>vehicles_delete_own</code> ポリシーが対象行を0件にするだけで、
+        エラーにはならない「何も起きない」操作になります（副作用が無いので
+        安全に no-op として扱えます）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const deleteVehicleFn = createServerFn({ method: 'POST' })
+  .validator(vehicleIdSchema)
+  .handler(({ data }) => deleteVehicleHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        <code>vehicleIdSchema</code> で <code>id</code> が UUID の形をしているかだけを
+        確認してから削除を実行します。他のサーバー関数と同じ構造です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/server/delete.ts
+  </footer>
+
+</div>
+</body>
+</html>

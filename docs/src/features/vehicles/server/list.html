@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>list.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>list.ts</h1>
+    <div class="doc-path">src/features/vehicles/server/list.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ログイン中ユーザーの車両一覧を返すサーバー関数です。車両一覧ページ
+      （<code>routes/_authed.vehicles.index.tsx</code>）の <code>loader</code> から呼ばれます。
+      Phase 4 の <code>auth/server/*.ts</code> で確立した「<code>xxxHandler</code>（純粋なロジック）
+      と <code>xxxFn</code>（<code>createServerFn</code> のラッパー）を分ける」パターンを、
+      このプロジェクトで初めて DB テーブルを触るコードに適用した最初の例です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>VehicleRow</code></td><td>type（export）</td><td><code>vehicles</code> テーブルの行の型（<code>database.types.ts</code> から抽出）</td></tr>
+        <tr><td><code>listVehiclesHandler</code></td><td>async function（export）</td><td>DB問い合わせの実処理。<code>deps</code> 注入でテスト可能</td></tr>
+        <tr><td><code>listVehiclesFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした、実際にルートから呼ぶ関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>interface ListVehiclesDeps {
+  supabase: Pick&lt;SupabaseClient&lt;Database&gt;, 'from'&gt;
+}</code></pre>
+      <p>
+        Supabase クライアント全体ではなく、実際に使う <code>.from()</code> メソッドだけを
+        <code>Pick</code> で抜き出した型を要求します。<code>auth/server/login.ts</code> が
+        <code>Pick&lt;SupabaseClient&lt;Database&gt;['auth'], 'signInWithPassword'&gt;</code> としているのと
+        同じ考え方です。テストではこの形に合う <code>{ from: vi.fn() }</code> という
+        最小限のオブジェクトを渡すだけで済み、Supabase クライアント全体をモックする
+        必要がありません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function listVehiclesHandler(deps: ListVehiclesDeps): Promise&lt;VehicleRow[]&gt; {
+  const { data, error } = await deps.supabase
+    .from('vehicles')
+    .select('*')
+    .order('created_at', { ascending: true })
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>user_id</code> での絞り込みをコード側に一切書いていないのが最大の要点です。
+        <code>vehicles_select_own</code> という RLS ポリシーが
+        <code>auth.uid() = user_id</code> の行だけを返すことをすでに保証しているため、
+        ここで同じ条件を重ねて書くと「RLS が正しく機能しているか」をアプリのコードが
+        隠してしまいます。エラー時は握りつぶさず例外を投げ、呼び出し元
+        （ルートの <code>loader</code>）に伝播させます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const listVehiclesFn = createServerFn({ method: 'GET' }).handler(() =>
+  listVehiclesHandler({ supabase: createSupabaseServerClient() }),
+)</code></pre>
+      <p>
+        <code>createSupabaseServerClient()</code> の呼び出しをこの <code>.handler()</code>
+        コールバックの中だけに押し込めています。これは <code>get-session.ts</code> と
+        全く同じ理由です。デフォルト引数などでこの呼び出しをハンドラ関数の外に
+        出してしまうと、クライアントバンドルにサーバー専用コードが混入し、
+        TanStack Start のビルドが import-protection エラーで失敗します。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/server/list.ts
+  </footer>
+
+</div>
+</body>
+</html>

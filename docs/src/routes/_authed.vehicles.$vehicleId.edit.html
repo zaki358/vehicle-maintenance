@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.$vehicleId.edit.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.$vehicleId.edit.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.$vehicleId.edit.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の編集ページです（URL: <code>/vehicles/$vehicleId/edit</code>）。
+      親レイアウトから受け取った現在の車両情報を <code>VehicleForm</code> の
+      <code>initialValues</code> として渡し、送信されたら <code>updateVehicleFn</code>
+      を呼んで詳細ページへ戻ります。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>編集ページのルート定義</td></tr>
+        <tr><td><code>EditVehiclePage</code></td><td>function（component）</td><td>初期値の組み立てと更新処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const initialValues: VehicleInput = {
+  name: vehicle.name,
+  vehicleType: vehicle.vehicle_type as VehicleType,
+  shakenExpiryDate: vehicle.shaken_expiry_date ? toDateString(vehicle.shaken_expiry_date) : null,
+  note: vehicle.note,
+}</code></pre>
+      <p>
+        DB の行（<code>vehicle_type</code> が生の <code>string</code>、
+        <code>shaken_expiry_date</code> が生の <code>string | null</code>）から、
+        <code>VehicleForm</code> が期待する検証済みの型 <code>VehicleInput</code>
+        （<code>VehicleType</code> と <code>DateString | null</code>）へ変換します。
+        <code>toDateString</code> は不正な値なら例外を投げるため、
+        自分で書き込んだはずのデータが壊れている場合に気づけます
+        （一覧ページの <code>as VehicleType</code> と同じく、自テーブルからの
+        読み取りであることを前提にした変換です）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>async function handleSubmit(input: VehicleInput): Promise&lt;VehicleFormResult&gt; {
+  try {
+    await updateVehicleFn({ data: { id: vehicle.id, ...input } })
+    await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
+    return { success: true }
+  } catch {
+    return { success: false, error: '更新に失敗しました。時間をおいて再度お試しください。' }
+  }
+}</code></pre>
+      <p>
+        <code>new.tsx</code> の <code>handleSubmit</code> とほぼ同じ形ですが、
+        更新対象を特定するために <code>id: vehicle.id</code> を入力に加えて
+        <code>updateVehicleFn</code>（<code>updateVehicleSchema</code> で
+        <code>id</code> を含めて検証する）に渡す点が異なります。
+        成功したら新規登録と同じく、対象の車両の詳細ページへ戻ります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.edit.tsx
+  </footer>
+
+</div>
+</body>
+</html>

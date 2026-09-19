@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>get.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>get.ts</h1>
+    <div class="doc-path">src/features/vehicles/server/get.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両を1件だけ取得するサーバー関数です。車両詳細・編集ページの土台になる
+      <code>routes/_authed.vehicles.$vehicleId.tsx</code>（レイアウトルート）の
+      <code>beforeLoad</code> から呼ばれ、取得した車両を子ルート（詳細・編集）へ
+      route context として引き渡します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>getVehicleHandler</code></td><td>async function（export）</td><td>DB問い合わせの実処理</td></tr>
+        <tr><td><code>getVehicleFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップし、<code>vehicleIdSchema</code> で入力を検証する関数</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function getVehicleHandler(input: VehicleIdInput, deps: GetVehicleDeps): Promise&lt;VehicleRow | null&gt; {
+  const { data, error } = await deps.supabase.from('vehicles').select('*').eq('id', input.id).maybeSingle()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>.single()</code> ではなく <code>.maybeSingle()</code> を使うのが要点です。
+        <code>.single()</code> は該当行が0件だとエラーを投げますが、このアプリでは
+        「存在しない ID」と「他人の車両（RLS が0件に絞り込んだ）」のどちらも
+        エラーではなく <code>null</code> として扱いたいため、<code>.maybeSingle()</code>
+        （0件なら <code>data: null, error: null</code>）を選んでいます。
+        両者を区別してエラーメッセージを出し分けてしまうと、
+        「この ID は誰かが使っている」という情報が他人に漏れます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export const getVehicleFn = createServerFn({ method: 'GET' })
+  .validator(vehicleIdSchema)
+  .handler(({ data }) => getVehicleHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+      <p>
+        <code>.validator(vehicleIdSchema)</code> により、ルートパラメータ由来の
+        文字列が UUID の形をしているかをハンドラ本体に渡す前に確認します。
+        <code>list.ts</code>・<code>get-session.ts</code> と同じく、
+        <code>createSupabaseServerClient()</code> の呼び出しは
+        <code>.handler()</code> の中に閉じ込めています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/server/get.ts
+  </footer>
+
+</div>
+</body>
+</html>

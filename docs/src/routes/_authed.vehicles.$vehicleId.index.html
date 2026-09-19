@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.$vehicleId.index.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.$vehicleId.index.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.$vehicleId.index.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の詳細ページです（URL: <code>/vehicles/$vehicleId</code>。親の
+      レイアウトルートと同じ URL に <code>.index</code> の子ルートとして重なります）。
+      車両区分・車検満了日・備考の表示、編集ページへのリンク、削除ボタンを持ちます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>詳細ページのルート定義</td></tr>
+        <tr><td><code>VehicleDetailPage</code></td><td>function（component）</td><td>表示と削除処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const { vehicle } = Route.useRouteContext()</code></pre>
+      <p>
+        親のレイアウトルート（<code>_authed.vehicles.$vehicleId.tsx</code>）の
+        <code>beforeLoad</code> が積んだ <code>vehicle</code> を受け取ります。
+        自分で <code>getVehicleFn</code> を呼び直す必要はありません。
+        <code>_authed.index.tsx</code> が <code>user</code> を受け取るのと同じ仕組みです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>async function handleDelete() {
+  const confirmed = window.confirm(`「${vehicle.name}」を削除します。整備記録も全て削除されます。よろしいですか？`)
+  if (!confirmed) {
+    return
+  }
+  setDeleting(true)
+  try {
+    await deleteVehicleFn({ data: { id: vehicle.id } })
+    await navigate({ to: '/vehicles' })
+  } finally {
+    setDeleting(false)
+  }
+}</code></pre>
+      <p>
+        削除は取り消せない操作（かつ整備記録も一緒に消える）なので、
+        <code>window.confirm</code> でのワンクッションを必ず挟みます。
+        キャンセルされたら何もせずに戻り、確認が取れた場合のみ
+        <code>deleteVehicleFn</code> を呼んで一覧ページへ遷移します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;p&gt;
+  車検満了日:{' '}
+  {vehicle.shaken_expiry_date ? formatJa(toDateString(vehicle.shaken_expiry_date)) : '車検対象外'}
+&lt;/p&gt;</code></pre>
+      <p>
+        DB の <code>shaken_expiry_date</code> は <code>null</code> 許容の生の
+        <code>string</code> です。<code>null</code>（250cc以下のバイク等）なら
+        「車検対象外」と表示し、値があれば <code>toDateString</code> で
+        ブランド型 <code>DateString</code> へ検証してから <code>formatJa</code>
+        （<code>date-fns</code> を使う表示専用の関数）で日本語表記に整形します。
+        素の文字列を直接 <code>new Date()</code> に渡さないのが、このプロジェクトの
+        JST/UTC のずれを防ぐ原則です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.$vehicleId.index.tsx
+  </footer>
+
+</div>
+</body>
+</html>

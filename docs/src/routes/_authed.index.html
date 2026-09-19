@@ -29,6 +29,11 @@
       これが無いと、認証フェーズの成果物をルートの入力欄まで見ることはできても、
       実際にブラウザで最後まで動かして確認することができませんでした。
     </p>
+    <p>
+      Phase 5（車両CRUD）で <code>/vehicles</code> 一式ができたため、
+      この仮ページから辿り着けるよう「車両一覧へ」のリンクを1本追加しています。
+      画面の本体はまだ仮実装のままで、Phase 7 で置き換わる方針に変わりはありません。
+    </p>
   </section>
 
   <section class="doc-section">
@@ -39,7 +44,7 @@
       </thead>
       <tbody>
         <tr><td><code>Route</code></td><td>const（export）</td><td><code>/_authed/</code>（URL は <code>/</code>）ルートの定義</td></tr>
-        <tr><td><code>AuthedHome</code></td><td>function（component）</td><td>ログイン中のメールアドレスとログアウトボタンだけを表示する</td></tr>
+        <tr><td><code>AuthedHome</code></td><td>function（component）</td><td>ログイン中のメールアドレス・車両一覧へのリンク・ログアウトボタンを表示する</td></tr>
       </tbody>
     </table>
   </section>

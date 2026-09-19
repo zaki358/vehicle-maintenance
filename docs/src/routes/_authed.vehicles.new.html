@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>_authed.vehicles.new.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>_authed.vehicles.new.tsx</h1>
+    <div class="doc-path">src/routes/_authed.vehicles.new.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両の新規登録ページです（URL: <code>/vehicles/new</code>）。
+      <code>VehicleForm</code> コンポーネントに空欄のフォームを描画させ、
+      送信されたら <code>createVehicleFn</code> を呼んで DB に保存し、
+      作成された車両の詳細ページへ遷移します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td><code>/vehicles/new</code> ルートの定義</td></tr>
+        <tr><td><code>NewVehiclePage</code></td><td>function（component）</td><td>フォームの表示と送信処理</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>async function handleSubmit(input: VehicleInput): Promise&lt;VehicleFormResult&gt; {
+  try {
+    const vehicle = await createVehicleFn({ data: input })
+    await navigate({ to: '/vehicles/$vehicleId', params: { vehicleId: vehicle.id } })
+    return { success: true }
+  } catch {
+    return { success: false, error: '登録に失敗しました。時間をおいて再度お試しください。' }
+  }
+}</code></pre>
+      <p>
+        <code>VehicleForm</code> はこのルートが「新規登録」であることを知らず、
+        検証済みの <code>VehicleInput</code> を <code>onSubmit</code> に渡すだけです。
+        ここではその入力を <code>createVehicleFn</code> に渡し、成功したら
+        新しく作られた車両の ID を使って詳細ページへ型安全に遷移します。
+        失敗時は例外を握りつぶさず、フォームがエラーとして表示できる形
+        （<code>{ success: false, error }</code>）に変換して返します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;VehicleForm submitLabel="登録" onSubmit={handleSubmit} /&gt;</code></pre>
+      <p>
+        <code>initialValues</code> を渡していません。<code>VehicleForm</code> は
+        <code>initialValues</code> が無ければ全項目を空欄から始めるため、
+        これだけで新規登録フォームになります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/routes/_authed.vehicles.new.tsx
+  </footer>
+
+</div>
+</body>
+</html>

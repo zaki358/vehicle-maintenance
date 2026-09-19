@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { logoutFn } from '@/features/auth/server/logout'
@@ -34,6 +34,9 @@ function AuthedHome() {
     <main>
       <h1>車両メンテナンス記録</h1>
       <p>ログイン中: {user.email ?? user.id}</p>
+      <p>
+        <Link to="/vehicles">車両一覧へ</Link>
+      </p>
       <button type="button" onClick={handleLogout} disabled={loggingOut}>
         ログアウト
       </button>

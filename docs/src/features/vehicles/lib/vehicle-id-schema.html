@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vehicle-id-schema.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>vehicle-id-schema.ts</h1>
+    <div class="doc-path">src/features/vehicles/lib/vehicle-id-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車両IDを検証するだけの小さな Zod スキーマです。Phase 5 で新設した
+      <code>features/vehicles/server/{get,update,delete}.ts</code> の入口で共通して使います。
+      URLパラメータ（<code>$vehicleId</code>）や削除ボタンから渡ってくる ID が
+      そもそも UUID の形をしていない場合に、DB へ問い合わせる前に弾くのが役割です。
+    </p>
+    <p>
+      その ID が「存在しない」のか「他人の車両で見えない」のかはこのスキーマの
+      責務ではなく、RLS と <code>get.ts</code>/<code>update.ts</code> 側の判断に委ねています
+      （詳しくは各ファイルのコメントを参照）。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>vehicleIdSchema</code></td><td>const（export）</td><td><code>{ id: string }</code> が UUID 形式であることを検証するスキーマ</td></tr>
+        <tr><td><code>VehicleIdInput</code></td><td>type（export）</td><td><code>vehicleIdSchema</code> から推論した入力の型</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const vehicleIdSchema = z.object({
+  id: z.uuid('車両IDの形式が正しくありません'),
+})</code></pre>
+      <p>
+        Zod 4 の <code>z.uuid()</code>（Zod 3系までの <code>z.string().uuid()</code> から
+        変わった書き方）で、<code>id</code> フィールドが UUID の形をしているかだけを見ます。
+        DB に実在するか・自分の車両かはここでは判定しません。無効な形式の値を
+        わざわざ Supabase へ問い合わせて確かめる無駄を避けるための、
+        入口での最低限のフィルタです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export type VehicleIdInput = z.infer&lt;typeof vehicleIdSchema&gt;</code></pre>
+      <p>
+        <code>vehicle-schema.ts</code> と同じ理由で、型はスキーマから逆算しています。
+        <code>get.ts</code> / <code>update.ts</code> / <code>delete.ts</code> の
+        ハンドラ関数の引数の型としてそのまま使われます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/lib/vehicle-id-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>
