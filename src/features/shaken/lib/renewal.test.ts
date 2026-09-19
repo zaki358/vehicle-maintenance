@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { toDateString } from '@/lib/date/date-string'
-import { computeNextShakenExpiry } from './renewal'
+import { SHAKEN_VALID_YEARS, computeNextShakenExpiry } from './renewal'
+
+describe('SHAKEN_VALID_YEARS', () => {
+  it('選択可能な有効期間（2年・3年）を列挙する', () => {
+    expect(SHAKEN_VALID_YEARS).toEqual([2, 3])
+  })
+})
 
 describe('computeNextShakenExpiry', () => {
   const d = toDateString

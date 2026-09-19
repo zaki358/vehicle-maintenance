@@ -3,13 +3,13 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-19(Phase 6 完了。整備記録CRUDのブラウザ動作確認まで完了)
+最終更新: 2026-09-19(Phase 7 完了。ダッシュボード・車検アラートのブラウザ動作確認まで完了)
 
 ---
 
 ## 現在地
 
-**Phase 1〜6 完了。次はPhase 7(ダッシュボードと車検アラート)。**
+**Phase 1〜7 完了。次はPhase 8(検証とデプロイ)。**
 `src/lib/date/*`（5ファイル）、`src/features/shaken/lib/*`（4ファイル）、
 `src/features/vehicles/lib/*`（3ファイル）、`src/features/maintenance/lib/*`（6ファイル）、
 `src/features/dashboard/lib/*`（2ファイル）、`src/features/auth/lib/*`（2ファイル）が
@@ -295,6 +295,72 @@
 - [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(266テスト全通過) /
       `npm run build` 全て green** — Phase 6完了
 
+### Phase 7（ダッシュボードと車検アラート）
+
+- [x] **`src/features/shaken/lib/renewal.ts` に `SHAKEN_VALID_YEARS` 定数を追加** —
+      `ShakenValidYears`（2|3）の全値を列挙する配列。車検完了フォームの
+      「有効期間」セレクトの選択肢を作るために使う。`work-types.ts` の
+      `WORK_TYPES`+`WorkType` と同じ「型の全値をUIに列挙する」パターン。1テスト追加
+- [x] **`src/features/shaken/lib/complete-shaken-schema.ts` 完成** —
+      `completeShakenSchema`（Zod）。受検日・新しい満了日・走行距離・部品/型式・備考を検証。
+      `record-schema.ts` と似た制約（走行距離0以上整数・文字数上限・trim）だが
+      `workType` を持たない別スキーマとして独立させた（車検完了は常に
+      `work_type='shaken'`固定のため）。「新しい満了日」は受検日との前後関係を
+      強制しない（手動修正を尊重するため）。10テスト
+- [x] **`src/features/maintenance/server/list-all.ts` 完成** — `listAllRecordsFn`。
+      ログイン中ユーザーの整備記録を車両を問わず全件取得する。ダッシュボードが
+      車両横断で最終整備日・現在の走行距離を集計するために新設（既存の`list.ts`は
+      1台の車両にスコープするため使えなかった）。2テスト
+- [x] **`src/features/shaken/server/complete-shaken.ts` 完成** — `completeShakenFn`。
+      Phase 2で作成済みのPostgres関数`complete_shaken`を`.rpc()`で呼び、
+      「整備記録(work_type='shaken')の挿入」と「車両の満了日更新」を1トランザクションで
+      実行する。`vehicleScopeSchema`（`maintenance/lib`）を機能をまたいで再利用
+      （`dashboard/lib/build-summary.ts`が`shaken/lib`・`vehicles/lib`を横断
+      importする既存の前例にならった）。`odometerKm`の`null`→`undefined`変換は
+      RPCの引数型（`p_odometer_km?: number`、null不可）とアプリの規約（nullで
+      「未記録」を表す）を橋渡しするため。2テスト
+- [x] **`src/features/shaken/complete-shaken-form.tsx` 完成** — `ShakenForm`。
+      受検日・有効期間・新しい満了日・走行距離・部品/型式・備考のフォーム。
+      「新しい満了日」は`computeNextShakenExpiry`の自動計算値を表示しつつ
+      手動修正もできる（`newExpiryDateOverride`が無ければ計算値、あれば
+      そちらを優先する`??`の連鎖）。受検日・有効期間を変更すると手動修正を
+      リセットする（`useEffect`を使わず、各`onChange`ハンドラ内で直接
+      リセットする設計）。7テスト
+- [x] **ルート3本完成** — `_authed.vehicles.$vehicleId.shaken.tsx`(新規。車検完了フォームの
+      表示と送信)/`_authed.vehicles.$vehicleId.index.tsx`(拡張。`shakenRequired`で
+      ガードした車検アラート表示＋「車検完了を記録」リンクを追加)/
+      `_authed.index.tsx`(Phase4の仮ホームを本実装のダッシュボードへ置き換え。
+      車両一覧・現在の走行距離・前回整備日・車検アラート＋ショートカットリンクを表示)
+- [x] **Phase 7全ファイルの解説ドキュメント生成完了** —
+      `docs/src/features/shaken/lib/{renewal(追記),complete-shaken-schema}.html`、
+      `docs/src/features/maintenance/server/list-all.html`、
+      `docs/src/features/shaken/server/complete-shaken.html`、
+      `docs/src/features/shaken/complete-shaken-form.html`、
+      `docs/src/routes/{_authed.index(全面改稿),_authed.vehicles.$vehicleId.shaken,
+      _authed.vehicles.$vehicleId.index(追記)}.html`
+- [x] **開発用Supabaseで使い捨てテストユーザーを作成しブラウザで実動作確認**
+      （実行前にユーザーへ確認を取ってから実施）——
+      車両登録（車検満了日を21日後に設定）→詳細・ダッシュボード両方で
+      「車検まであと21日です。お早めに受検してください。」（danger段階）を確認→
+      「車検完了を記録」→受検日入力で新しい満了日が制度どおり自動計算（繰り越し）
+      されることを確認→走行距離入力→送信→満了日が更新され、整備記録に
+      `work_type='shaken'`の記録が1件増えたことを確認（RPCの1トランザクション動作）→
+      ダッシュボードで走行距離・前回整備日が反映されアラートが消えたことを確認→
+      満了日なしの車両（バイク・カブ90）を登録し、詳細・ダッシュボードどちらにも
+      車検UI・アラートが一切出ないことを確認（E2E要件どおり）。
+      テストユーザー・車両・記録は確認後すぐ削除済み（`on delete cascade`で
+      ユーザー削除により連鎖削除。一時スクリプト`scripts/_verify-phase7-user.ts`も
+      コミット前に削除済み）
+- [x] **開発サーバーのポート競合に対応** — 別セッションが`vehicle-maintenance-dev`
+      （ポート3000）を使用中だったため、`.claude/launch.json`に
+      `vehicle-maintenance-dev-alt`（ポート3101、`npx vite dev --port 3101`で
+      `package.json`の`dev`スクリプトは変更しない）を追加してブラウザ確認に使用。
+      `package.json`の`dev`スクリプト自体は招待メールのリダイレクトURL設定
+      （ポート3000がSupabaseダッシュボードに登録されている想定）と結びついているため
+      変更しなかった
+- [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(288テスト全通過) /
+      `npm run build` 全て green** — Phase 7完了
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -381,40 +447,34 @@
 
 ## 次にやること
 
-**Phase 6（整備記録 CRUD）— 完了。**
+**Phase 7（ダッシュボードと車検アラート）— 完了。**
 
-- ~~`features/maintenance/server/(list,create,update,delete,list-part-details)`~~ — **完成済み**
-- ~~`_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`~~ — **完成済み**
-- ~~`_authed.vehicles.$vehicleId.index.tsx`に整備記録一覧・フィルタ・削除を統合~~ — **完成済み**
-- ~~プリセット＋「その他」自由入力、部品サジェスト、走行距離逆行警告をUIに反映~~ — **完成済み**
-- ~~ブラウザでの動作確認~~ — **完成済み**（登録・一覧・フィルタ・編集・逆行警告・削除・404の一連を確認済み）
+- ~~`features/shaken/lib/complete-shaken-schema.ts`~~ — **完成済み**
+- ~~`features/maintenance/server/list-all.ts`~~ — **完成済み**
+- ~~`features/shaken/server/complete-shaken.ts`（RPC呼び出し）~~ — **完成済み**
+- ~~`features/shaken/complete-shaken-form.tsx`~~ — **完成済み**
+- ~~`_authed.vehicles.$vehicleId.shaken.tsx`（新規ルート）~~ — **完成済み**
+- ~~`_authed.vehicles.$vehicleId.index.tsx`に車検アラート表示を統合~~ — **完成済み**
+- ~~`_authed.index.tsx`をダッシュボード本実装に置き換え~~ — **完成済み**
+- ~~ブラウザでの動作確認~~ — **完成済み**（車検アラート表示・車検完了RPC・ダッシュボード反映・
+  車検対象外車両でUI非表示、の一連を確認済み）
 
-**次は Phase 7（ダッシュボードと車検アラート）に着手する**:
-`features/dashboard/*`（`lib`は既にPhase3で完成済み：`since-last-service`/`build-summary`）と
-`features/shaken/*`（`lib`も既にPhase3で完成済み：`days-remaining`/`alert-tier`/`renewal`/`messages`）の
-UI実装、および`complete-shaken`のRPC呼び出し（`security invoker`のPostgres関数、
-記録追加＋満了日更新をアトミックに実行）を行う。`_authed.index.tsx`
-（Phase4作成の仮ホーム画面）をダッシュボード本実装に置き換える。
-Phase 5/6で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォームはfeatures/*直下に
-素のHTML+Zodで実装しlib/には置かない」「routes/**は単体テスト対象外でE2Eに委ねる」
-「1件取得が必要な場面では専用get.tsを作らずlistFn+.find()で代替する場合がある」の
-パターンをそのまま踏襲すること。
+**次は Phase 8（検証とデプロイ）に着手する**:
+Playwright E2E（モバイル＋デスクトップ、`e2e-runner`エージェント経由。実装プランの
+「検証方法 > E2E」に優先順位付きのシナリオ一覧あり）、`code-reviewer`/`security-reviewer`
+によるレビュー、`wrangler deploy`（依頼者の`wrangler login`が前提。まだ未実施）。
 実装プラン全文の該当箇所（`C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`）を
-先に読み直してから着手すること。
+先に読み直してから着手すること。Phase 9（docsのHTML解説ページ）は個別ファイルの解説は
+各フェーズで既に作成済みなので、残るのは「プロジェクト全体解説ページ」（CLAUDE.mdのルール4）。
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 266 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 288 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
-**中断時点**: Phase 6 完了。Phase 7（ダッシュボードと車検アラート）に未着手。
-まだ未コミットの変更（`src/features/maintenance/lib/{vehicle-scope-schema,record-id-schema}.*`・
-`src/features/maintenance/server/*`・`src/features/maintenance/record-form.*`・
-`src/routes/_authed.vehicles.$vehicleId.index.tsx`・
-`src/routes/_authed.vehicles.$vehicleId.records.{new,$recordId.edit}.tsx`・
-`src/routeTree.gen.ts`・`docs/src/features/maintenance/*`・
-`docs/src/routes/_authed.vehicles.$vehicleId.*` など）があるので、
-コミットするかどうか依頼者に確認する。
+**中断時点**: Phase 7 完了。Phase 8（検証とデプロイ）に未着手。
+未コミットの変更があるので、コミットするかどうか依頼者に確認する
+（`.claude/launch.json`にポート競合対応で追加した`vehicle-maintenance-dev-alt`設定を含む）。
 
 ---
 
@@ -493,6 +553,6 @@ Phase 5/6で確立した「server/はxxxHandler(deps注入)+xxxFn」「フォー
 - [x] Phase 4 — 認証（Supabase クライアント、login/set-password、_authed ガード、招待スクリプト。ブラウザで動作確認済み）
 - [x] Phase 5 — 車両 CRUD（server 5本 + vehicle-form + ルート5本。ブラウザで動作確認済み）
 - [x] Phase 6 — 整備記録 CRUD（server 5本 + record-form + ルート3本。ブラウザで動作確認済み）
-- [ ] Phase 7 — ダッシュボードと車検アラート
+- [x] Phase 7 — ダッシュボードと車検アラート（complete-shaken RPC + ダッシュボード/車検UI。ブラウザで動作確認済み）
 - [ ] Phase 8 — 検証（E2E / レビュー）とデプロイ
-- [ ] Phase 9 — docs の HTML 解説ページ
+- [ ] Phase 9 — docs の HTML 解説ページ（各ファイル解説は各フェーズで作成済み。残るのはプロジェクト全体解説ページ）

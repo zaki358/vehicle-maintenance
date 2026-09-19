@@ -37,6 +37,7 @@
       </thead>
       <tbody>
         <tr><td><code>ShakenValidYears</code></td><td>type（export）</td><td>有効期間。2年 または 3年（新車初回）のみを許す</td></tr>
+        <tr><td><code>SHAKEN_VALID_YEARS</code></td><td>const（export）</td><td><code>ShakenValidYears</code> の全値 <code>[2, 3]</code>。UIの選択肢を列挙するのに使う</td></tr>
         <tr><td><code>RenewalInput</code></td><td>type（export）</td><td>計算に必要な入力（受検日・旧満了日・有効期間）</td></tr>
         <tr><td><code>computeNextShakenExpiry</code></td><td>function（export）</td><td>新しい満了日を計算する</td></tr>
       </tbody>
@@ -47,11 +48,20 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>export type ShakenValidYears = 2 | 3</code></pre>
+      <pre><code>export type ShakenValidYears = 2 | 3
+
+export const SHAKEN_VALID_YEARS: readonly ShakenValidYears[] = [2, 3]</code></pre>
       <p>
         車検の有効期間は「2年」か「3年（新車初回）」の2択しかありません。
         <code>number</code> ではなくこのリテラル型にすることで、
         誤って「5年」のような値を渡すコードを型検査の段階で弾けます。
+      </p>
+      <p>
+        <code>SHAKEN_VALID_YEARS</code> は Phase 7 で追加した配列定数です。
+        車検完了フォーム（<code>complete-shaken-form.tsx</code>）の
+        「有効期間」セレクトボックスを <code>.map()</code> で列挙するために使います。
+        <code>WORK_TYPES</code>（<code>maintenance/lib/work-types.ts</code>）と同じく、
+        「型として許される値の集合」と「UIに列挙する値」を1箇所にまとめる狙いです。
       </p>
     </div>
 

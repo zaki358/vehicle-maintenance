@@ -5,6 +5,9 @@ import { addMonths, addYears } from '@/lib/date/add-months'
 /** 車検の有効期間。新規登録・新車初回は3年、それ以降の更新は2年が既定。 */
 export type ShakenValidYears = 2 | 3
 
+/** 選択肢としてUIに列挙する際に使う `ShakenValidYears` の全値。 */
+export const SHAKEN_VALID_YEARS: readonly ShakenValidYears[] = [2, 3]
+
 export type RenewalInput = {
   /** 車検を受けた日 */
   completedOn: DateString

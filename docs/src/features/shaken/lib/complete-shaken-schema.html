@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>complete-shaken-schema.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>complete-shaken-schema.ts</h1>
+    <div class="doc-path">src/features/shaken/lib/complete-shaken-schema.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車検完了フォームの入力を検証する Zod スキーマです。受検日・新しい満了日・
+      走行距離・部品/型式・備考の5項目を持ち、整備記録の登録フォーム用
+      <code>maintenance/lib/record-schema.ts</code> と似ていますが、
+      「作業内容（<code>workType</code>）」を持たない点が異なります
+      （車検完了は常に <code>work_type = 'shaken'</code> で固定のため）。
+    </p>
+    <p>
+      「新しい満了日」を検証はしても、受検日との前後関係までは強制しない設計です。
+      この値は <code>renewal.ts</code> の <code>computeNextShakenExpiry</code> が
+      自動計算した提案値であり、利用者が画面上で手動修正できる仕様
+      （要件「計算結果を表示し手動修正も可」）のため、業務ルールをここで
+      サーバー側から強制すると手動修正そのものを塞いでしまいます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>completeShakenSchema</code></td><td>const（export）</td><td>車検完了フォームの入力を検証する Zod スキーマ</td></tr>
+        <tr><td><code>CompleteShakenInput</code></td><td>type（export）</td><td><code>completeShakenSchema</code> から推論した入力型</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export const completeShakenSchema = z.object({
+  performedOn: dateStringSchema,
+  newExpiryDate: dateStringSchema,
+  odometerKm: z
+    .number()
+    .int('走行距離は整数で入力してください')
+    .nonnegative('走行距離は0以上で入力してください')
+    .nullable()
+    .default(null),
+  partDetail: z.string().trim().max(PART_DETAIL_MAX_LENGTH, ...).default(''),
+  note: z.string().trim().max(NOTE_MAX_LENGTH, ...).default(''),
+})</code></pre>
+      <p>
+        <code>performedOn</code>（受検日）と <code>newExpiryDate</code>（新しい満了日）は、
+        どちらも共有スキーマ <code>lib/date/date-string-schema.ts</code> の
+        <code>dateStringSchema</code> を使い、「実在する <code>YYYY-MM-DD</code> か」だけを検証します。
+      </p>
+      <p>
+        <code>odometerKm</code>・<code>partDetail</code>・<code>note</code> は
+        <code>record-schema.ts</code> の同名フィールドと検証ルール（整数・0以上・最大文字数・trim）が
+        同一です。異なるテーブル操作用のスキーマを意図的に分けているため、
+        定数（最大文字数）も含めてこのファイル内で完結させています
+        （3〜4行程度の重複であれば、無理に共通化して2つの機能をカップリングさせない方針）。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/shaken/lib/complete-shaken-schema.ts
+  </footer>
+
+</div>
+</body>
+</html>

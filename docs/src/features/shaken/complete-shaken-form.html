@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>complete-shaken-form.tsx</title>
+<link rel="stylesheet" href="../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>complete-shaken-form.tsx</h1>
+    <div class="doc-path">src/features/shaken/complete-shaken-form.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車検完了を記録するためのフォームコンポーネントです。
+      <code>vehicle-form.tsx</code> / <code>record-form.tsx</code> と同じく
+      素のHTML要素＋Zodスキーマで実装しており、UIライブラリは使っていません。
+      受検日・有効期間（2年/3年）・新しい満了日・走行距離・部品/型式・備考を入力し、
+      送信すると <code>complete-shaken-schema.ts</code> で検証してから
+      呼び出し元（ルート）の <code>onSubmit</code> に渡します。
+    </p>
+    <p>
+      このフォームの中心は「新しい満了日」欄です。<code>renewal.ts</code> の
+      <code>computeNextShakenExpiry</code>（制度どおりの繰り越しルール）で自動計算した値を
+      表示しつつ、利用者が直接編集もできます（要件「計算結果を表示し手動修正も可」）。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ShakenFormResult</code></td><td>type（export）</td><td>送信結果（成功、または失敗時のエラーメッセージ）</td></tr>
+        <tr><td><code>ShakenFormProps</code></td><td>interface</td><td>コンポーネントのprops（更新前の満了日・送信ラベル・送信ハンドラ）</td></tr>
+        <tr><td><code>ShakenForm</code></td><td>function（export）</td><td>車検完了フォーム本体</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const [performedOn, setPerformedOn] = useState('')
+const [years, setYears] = useState&lt;ShakenValidYears&gt;(2)
+const [newExpiryDateOverride, setNewExpiryDateOverride] = useState&lt;string | null&gt;(null)
+...
+const computedExpiry = isDateString(performedOn)
+  ? computeNextShakenExpiry({ completedOn: performedOn, currentExpiry, years })
+  : null
+const newExpiryDate = newExpiryDateOverride ?? computedExpiry ?? ''</code></pre>
+      <p>
+        「新しい満了日」欄の値は、<code>newExpiryDateOverride</code>（利用者が直接編集した値。
+        未編集なら <code>null</code>）を最優先し、無ければ自動計算値
+        <code>computedExpiry</code> を使う、という優先順位の組み立てです。
+        これにより「表示はするが上書きもできる」という要件をシンプルな
+        <code>??</code> の連鎖だけで実現しています。
+      </p>
+      <p>
+        <code>useEffect</code> を使わずに済んでいるのもポイントです。
+        「受検日・有効期間が変わったら手動修正をリセットする」という挙動は、
+        下記の <code>handlePerformedOnChange</code> / <code>handleYearsChange</code>
+        の中で <code>setNewExpiryDateOverride(null)</code> を直接呼ぶだけで
+        表現できています（変更の起点が自分自身の <code>onChange</code> の中にあるため）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>function handlePerformedOnChange(value: string) {
+  setPerformedOn(value)
+  setNewExpiryDateOverride(null)
+}
+
+function handleYearsChange(value: string) {
+  setYears(Number(value) as ShakenValidYears)
+  setNewExpiryDateOverride(null)
+}</code></pre>
+      <p>
+        受検日または有効期間を変更するたびに、手動修正した「新しい満了日」を
+        破棄して自動計算に戻します。これをしないと、「古い受検日に対して
+        手動で直した満了日」が新しい受検日にそのまま残ってしまい、
+        実際の制度上の満了日とズレたまま気づかれない危険があります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const parsed = completeShakenSchema.safeParse({
+  performedOn,
+  newExpiryDate,
+  odometerKm: odometerKm === '' ? null : Number(odometerKm),
+  partDetail,
+  note,
+})</code></pre>
+      <p>
+        送信処理自体は <code>vehicle-form.tsx</code> / <code>record-form.tsx</code> と
+        まったく同じ形です。<code>safeParse</code> の結果が失敗なら最初のエラーメッセージを
+        <code>role="alert"</code> の要素に表示し、成功なら <code>onSubmit</code>
+        （呼び出し元のルートが渡す、サーバー関数呼び出しのラッパー）を呼びます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/shaken/complete-shaken-form.tsx
+  </footer>
+
+</div>
+</body>
+</html>

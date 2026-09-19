@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "vehicle-maintenance-dev-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "dev", "--port", "3101"],
+      "port": 3101
     }
   ]
 }

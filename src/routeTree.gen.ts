@@ -18,6 +18,7 @@ import { Route as AuthedVehiclesVehicleIdRouteImport } from './routes/_authed.ve
 import { Route as AuthedVehiclesNewRouteImport } from './routes/_authed.vehicles.new'
 import { Route as AuthedVehiclesVehicleIdIndexRouteImport } from './routes/_authed.vehicles.$vehicleId.index'
 import { Route as AuthedVehiclesVehicleIdEditRouteImport } from './routes/_authed.vehicles.$vehicleId.edit'
+import { Route as AuthedVehiclesVehicleIdShakenRouteImport } from './routes/_authed.vehicles.$vehicleId.shaken'
 import { Route as AuthedVehiclesVehicleIdRecordsNewRouteImport } from './routes/_authed.vehicles.$vehicleId.records.new'
 import { Route as AuthedVehiclesVehicleIdRecordsRecordIdEditRouteImport } from './routes/_authed.vehicles.$vehicleId.records.$recordId.edit'
 
@@ -67,6 +68,12 @@ const AuthedVehiclesVehicleIdEditRoute =
     path: '/edit',
     getParentRoute: () => AuthedVehiclesVehicleIdRoute,
   } as any)
+const AuthedVehiclesVehicleIdShakenRoute =
+  AuthedVehiclesVehicleIdShakenRouteImport.update({
+    id: '/shaken',
+    path: '/shaken',
+    getParentRoute: () => AuthedVehiclesVehicleIdRoute,
+  } as any)
 const AuthedVehiclesVehicleIdRecordsNewRoute =
   AuthedVehiclesVehicleIdRecordsNewRouteImport.update({
     id: '/records/new',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/vehicles/new': typeof AuthedVehiclesNewRoute
   '/vehicles/': typeof AuthedVehiclesIndexRoute
   '/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
+  '/vehicles/$vehicleId/shaken': typeof AuthedVehiclesVehicleIdShakenRoute
   '/vehicles/$vehicleId/': typeof AuthedVehiclesVehicleIdIndexRoute
   '/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
   '/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
@@ -99,6 +107,7 @@ export interface FileRoutesByTo {
   '/vehicles/new': typeof AuthedVehiclesNewRoute
   '/vehicles': typeof AuthedVehiclesIndexRoute
   '/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
+  '/vehicles/$vehicleId/shaken': typeof AuthedVehiclesVehicleIdShakenRoute
   '/vehicles/$vehicleId': typeof AuthedVehiclesVehicleIdIndexRoute
   '/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
   '/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
@@ -113,6 +122,7 @@ export interface FileRoutesById {
   '/_authed/vehicles/new': typeof AuthedVehiclesNewRoute
   '/_authed/vehicles/': typeof AuthedVehiclesIndexRoute
   '/_authed/vehicles/$vehicleId/edit': typeof AuthedVehiclesVehicleIdEditRoute
+  '/_authed/vehicles/$vehicleId/shaken': typeof AuthedVehiclesVehicleIdShakenRoute
   '/_authed/vehicles/$vehicleId/': typeof AuthedVehiclesVehicleIdIndexRoute
   '/_authed/vehicles/$vehicleId/records/new': typeof AuthedVehiclesVehicleIdRecordsNewRoute
   '/_authed/vehicles/$vehicleId/records/$recordId/edit': typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/vehicles/new'
     | '/vehicles/'
     | '/vehicles/$vehicleId/edit'
+    | '/vehicles/$vehicleId/shaken'
     | '/vehicles/$vehicleId/'
     | '/vehicles/$vehicleId/records/new'
     | '/vehicles/$vehicleId/records/$recordId/edit'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/vehicles/new'
     | '/vehicles'
     | '/vehicles/$vehicleId/edit'
+    | '/vehicles/$vehicleId/shaken'
     | '/vehicles/$vehicleId'
     | '/vehicles/$vehicleId/records/new'
     | '/vehicles/$vehicleId/records/$recordId/edit'
@@ -151,6 +163,7 @@ export interface FileRouteTypes {
     | '/_authed/vehicles/new'
     | '/_authed/vehicles/'
     | '/_authed/vehicles/$vehicleId/edit'
+    | '/_authed/vehicles/$vehicleId/shaken'
     | '/_authed/vehicles/$vehicleId/'
     | '/_authed/vehicles/$vehicleId/records/new'
     | '/_authed/vehicles/$vehicleId/records/$recordId/edit'
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedVehiclesVehicleIdEditRouteImport
       parentRoute: typeof AuthedVehiclesVehicleIdRoute
     }
+    '/_authed/vehicles/$vehicleId/shaken': {
+      id: '/_authed/vehicles/$vehicleId/shaken'
+      path: '/shaken'
+      fullPath: '/vehicles/$vehicleId/shaken'
+      preLoaderRoute: typeof AuthedVehiclesVehicleIdShakenRouteImport
+      parentRoute: typeof AuthedVehiclesVehicleIdRoute
+    }
     '/_authed/vehicles/$vehicleId/records/new': {
       id: '/_authed/vehicles/$vehicleId/records/new'
       path: '/records/new'
@@ -246,6 +266,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedVehiclesVehicleIdRouteChildren {
   AuthedVehiclesVehicleIdEditRoute: typeof AuthedVehiclesVehicleIdEditRoute
+  AuthedVehiclesVehicleIdShakenRoute: typeof AuthedVehiclesVehicleIdShakenRoute
   AuthedVehiclesVehicleIdIndexRoute: typeof AuthedVehiclesVehicleIdIndexRoute
   AuthedVehiclesVehicleIdRecordsNewRoute: typeof AuthedVehiclesVehicleIdRecordsNewRoute
   AuthedVehiclesVehicleIdRecordsRecordIdEditRoute: typeof AuthedVehiclesVehicleIdRecordsRecordIdEditRoute
@@ -254,6 +275,7 @@ interface AuthedVehiclesVehicleIdRouteChildren {
 const AuthedVehiclesVehicleIdRouteChildren: AuthedVehiclesVehicleIdRouteChildren =
   {
     AuthedVehiclesVehicleIdEditRoute: AuthedVehiclesVehicleIdEditRoute,
+    AuthedVehiclesVehicleIdShakenRoute: AuthedVehiclesVehicleIdShakenRoute,
     AuthedVehiclesVehicleIdIndexRoute: AuthedVehiclesVehicleIdIndexRoute,
     AuthedVehiclesVehicleIdRecordsNewRoute:
       AuthedVehiclesVehicleIdRecordsNewRoute,

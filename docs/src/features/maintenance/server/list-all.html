@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>list-all.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>list-all.ts</h1>
+    <div class="doc-path">src/features/maintenance/server/list-all.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ログイン中ユーザーの整備記録を、車両を問わず全件取得するサーバー関数です。
+      Phase 7 のダッシュボード（<code>dashboard/lib/build-summary.ts</code>）が、
+      「車両ごとの現在の走行距離」「最終整備日」を車両横断で集計するために必要になり、
+      新設しました。
+    </p>
+    <p>
+      既存の <code>list.ts</code> は <code>vehicleId</code> で1台の車両にスコープしますが、
+      ダッシュボードは登録済みの全車両を一度に表示するため、車両IDを先に知らなくても
+      「自分の記録を全部」取得できる入口が必要でした。それがこのファイルです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ListAllRecordsDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
+        <tr><td><code>listAllRecordsHandler</code></td><td>async function（export）</td><td>ログイン中ユーザーの整備記録を全件取得する純粋なハンドラ</td></tr>
+        <tr><td><code>listAllRecordsFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export async function listAllRecordsHandler(deps: ListAllRecordsDeps): Promise&lt;MaintenanceRecordRow[]&gt; {
+  const { data, error } = await deps.supabase.from('maintenance_records').select('*')
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        <code>vehicleId</code> による <code>.eq()</code> 絞り込みが無いのが <code>list.ts</code> との
+        唯一の違いです。<code>user_id</code> での絞り込みも書きません — これは
+        <code>vehicles/server/list.ts</code> と同じ理由で、
+        <code>maintenance_records_select_own</code> ポリシー（RLS）が
+        既に <code>auth.uid() = user_id</code> を強制しているため、
+        アプリコード側で二重に絞り込むとポリシーが正しく機能しているかを
+        隠してしまいます。
+      </p>
+      <p>
+        並び順を指定していないのも意図的です。呼び出し側（ダッシュボードの
+        コンポーネント）は車両ごとに集計してから <code>dashboard/lib/since-last-service.ts</code>
+        で最新日を求めるため、この時点での順序に意味がありません。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/list-all.ts
+  </footer>
+
+</div>
+</body>
+</html>

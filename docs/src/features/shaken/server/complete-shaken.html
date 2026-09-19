@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>complete-shaken.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>complete-shaken.ts</h1>
+    <div class="doc-path">src/features/shaken/server/complete-shaken.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      車検完了を記録するサーバー関数です。「整備記録（<code>work_type = 'shaken'</code>）を
+      1件挿入する」「車両の満了日を更新する」という2つのテーブル書き込みを、
+      Postgres 関数 <code>complete_shaken</code>（Phase 2 で作成済みの RPC）を
+      1回呼ぶことで、1トランザクションとして実行します。
+    </p>
+    <p>
+      なぜ RPC が必要かというと、PostgREST の単発リクエスト（<code>.from().insert()</code> や
+      <code>.from().update()</code>）はテーブルを跨いだトランザクションを組めないためです。
+      素朴に2回に分けて呼ぶと、途中でエラーが起きたときに
+      「整備記録だけ増えて満了日が更新されない」という半端な状態が起こりえます。
+      この関数はその隙を無くすのが存在理由です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>completeShakenRequestSchema</code></td><td>const</td><td><code>vehicleScopeSchema</code> と <code>completeShakenSchema</code> を合成した入力スキーマ</td></tr>
+        <tr><td><code>CompleteShakenRequestInput</code></td><td>type（export）</td><td>合成スキーマから推論した入力型</td></tr>
+        <tr><td><code>CompletedShakenRecord</code></td><td>type（export）</td><td>RPCが返す <code>maintenance_records</code> 行の型</td></tr>
+        <tr><td><code>CompleteShakenDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース（<code>rpc</code> のみ）</td></tr>
+        <tr><td><code>completeShakenHandler</code></td><td>async function（export）</td><td>RPCを呼び出す純粋なハンドラ</td></tr>
+        <tr><td><code>completeShakenFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>const completeShakenRequestSchema = vehicleScopeSchema.extend({ shaken: completeShakenSchema })</code></pre>
+      <p>
+        <code>maintenance/server/create.ts</code> の <code>createRecordSchema</code> と
+        同じ合成パターンです。「どの車両か」（<code>vehicleId</code>）と
+        「車検完了の入力内容」（<code>shaken</code>）を、ネストしたフィールドとして
+        合成しています。<code>vehicleScopeSchema</code> は本来 <code>maintenance</code>
+        機能のスキーマですが、<code>dashboard/lib/build-summary.ts</code> が
+        <code>shaken/lib</code> や <code>vehicles/lib</code> を横断的にインポートしている
+        既存の前例にならい、機能をまたいだ再利用としてそのままインポートしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export async function completeShakenHandler(
+  input: CompleteShakenRequestInput,
+  deps: CompleteShakenDeps,
+): Promise&lt;CompletedShakenRecord&gt; {
+  const { data, error } = await deps.supabase.rpc('complete_shaken', {
+    p_vehicle_id: input.vehicleId,
+    p_performed_on: input.shaken.performedOn,
+    p_new_expiry_date: input.shaken.newExpiryDate,
+    p_odometer_km: input.shaken.odometerKm ?? undefined,
+    p_part_detail: input.shaken.partDetail,
+    p_note: input.shaken.note,
+  })
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}</code></pre>
+      <p>
+        他のサーバー関数が <code>deps.supabase.from(...)</code> を使うのに対し、
+        ここでは <code>deps.supabase.rpc(...)</code> を使う点が特徴です。
+        <code>CompleteShakenDeps</code> も <code>Pick&lt;SupabaseClient&lt;Database&gt;, 'rpc'&gt;</code>
+        と絞り込み、テストでは <code>rpc</code> だけをモックすれば済むようにしています。
+      </p>
+      <p>
+        <code>p_odometer_km: input.shaken.odometerKm ?? undefined</code> の変換が要点です。
+        <code>database.types.ts</code> が生成した RPC の引数型では
+        <code>p_odometer_km</code> は <code>number | undefined</code>（<code>null</code> 不可）ですが、
+        アプリ内では「走行距離を記録しなかった」を <code>null</code> で表現する規約
+        （<code>record-schema.ts</code> と同じ）のため、ここで橋渡しをしています。
+      </p>
+      <p>
+        RPC 自体は Phase 2 で <code>security invoker</code> として作成済みのため、
+        呼び出したユーザーの権限で実行されます。他人の車両IDを渡しても
+        RLS がブロックし、関数内の <code>if not found then raise exception</code> で
+        例外になります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-19 ／ 対象ファイル: src/features/shaken/server/complete-shaken.ts
+  </footer>
+
+</div>
+</body>
+</html>

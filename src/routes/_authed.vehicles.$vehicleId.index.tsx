@@ -4,8 +4,13 @@ import { useMemo, useState } from 'react'
 import { deleteVehicleFn } from '@/features/vehicles/server/delete'
 import { vehicleTypeLabel } from '@/features/vehicles/lib/vehicle-type'
 import type { VehicleType } from '@/features/vehicles/lib/vehicle-type'
+import { shakenRequired } from '@/features/vehicles/lib/shaken-required'
+import { shakenAlertTier } from '@/features/shaken/lib/alert-tier'
+import { daysUntilExpiry } from '@/features/shaken/lib/days-remaining'
+import { shakenTierMessage } from '@/features/shaken/lib/messages'
 import { toDateString } from '@/lib/date/date-string'
 import { formatJa } from '@/lib/date/format-ja'
+import { todayInJst } from '@/lib/date/jst'
 import { deleteRecordFn } from '@/features/maintenance/server/delete'
 import { listRecordsFn } from '@/features/maintenance/server/list'
 import type { MaintenanceRecordRow } from '@/features/maintenance/server/list'
@@ -81,14 +86,28 @@ function VehicleDetailPage() {
     }
   }
 
+  const shakenExpiryDate = vehicle.shaken_expiry_date ? toDateString(vehicle.shaken_expiry_date) : null
+  const shakenTier = shakenAlertTier(shakenExpiryDate, todayInJst())
+  const shakenMessage =
+    shakenTier === 'none' ? null : shakenTierMessage(shakenTier, daysUntilExpiry(shakenExpiryDate, todayInJst()))
+
   return (
     <main>
       <h1>{vehicle.name}</h1>
       <p>車両区分: {vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}</p>
       <p>
-        車検満了日:{' '}
-        {vehicle.shaken_expiry_date ? formatJa(toDateString(vehicle.shaken_expiry_date)) : '車検対象外'}
+        車検満了日: {shakenExpiryDate ? formatJa(shakenExpiryDate) : '車検対象外'}
       </p>
+      {shakenRequired(shakenExpiryDate) && (
+        <section>
+          {shakenMessage && <p role={shakenTier === 'warning' ? 'status' : 'alert'}>{shakenMessage}</p>}
+          <p>
+            <Link to="/vehicles/$vehicleId/shaken" params={{ vehicleId: vehicle.id }}>
+              車検完了を記録
+            </Link>
+          </p>
+        </section>
+      )}
       {vehicle.note && <p>備考: {vehicle.note}</p>}
       <p>
         <Link to="/vehicles/$vehicleId/edit" params={{ vehicleId: vehicle.id }}>

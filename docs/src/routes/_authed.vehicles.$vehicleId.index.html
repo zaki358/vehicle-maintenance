@@ -38,7 +38,7 @@
       <tbody>
         <tr><td><code>Route</code></td><td>const（export）</td><td>詳細ページのルート定義。<code>loader</code>で整備記録一覧を取得</td></tr>
         <tr><td><code>toFilterable</code></td><td>function</td><td>DBの行を <code>filter-records.ts</code>/<code>sort-records.ts</code> が使える形へ変換</td></tr>
-        <tr><td><code>VehicleDetailPage</code></td><td>function（component）</td><td>表示・車両削除・記録の絞り込みと削除</td></tr>
+        <tr><td><code>VehicleDetailPage</code></td><td>function（component）</td><td>表示・車検アラート・車両削除・記録の絞り込みと削除</td></tr>
       </tbody>
     </table>
   </section>
@@ -122,6 +122,38 @@
         <code>deletingRecordId</code> に保持し、その行のボタンだけを
         <code>disabled</code> にすることで、複数行を誤って連打しても
         他の行の操作は妨げません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const shakenExpiryDate = vehicle.shaken_expiry_date ? toDateString(vehicle.shaken_expiry_date) : null
+const shakenTier = shakenAlertTier(shakenExpiryDate, todayInJst())
+const shakenMessage =
+  shakenTier === 'none' ? null : shakenTierMessage(shakenTier, daysUntilExpiry(shakenExpiryDate, todayInJst()))
+...
+{shakenRequired(shakenExpiryDate) &amp;&amp; (
+  &lt;section&gt;
+    {shakenMessage &amp;&amp; &lt;p role={shakenTier === 'warning' ? 'status' : 'alert'}&gt;{shakenMessage}&lt;/p&gt;}
+    &lt;p&gt;
+      &lt;Link to="/vehicles/$vehicleId/shaken" params={{ vehicleId: vehicle.id }}&gt;
+        車検完了を記録
+      &lt;/Link&gt;
+    &lt;/p&gt;
+  &lt;/section&gt;
+)}</code></pre>
+      <p>
+        Phase 7 で追加した車検アラート表示です。Phase 3 で完成済みの
+        <code>shaken/lib</code>（<code>shakenAlertTier</code>・<code>shakenTierMessage</code>・
+        <code>days-remaining.ts</code>の<code>daysUntilExpiry</code>）と
+        <code>vehicles/lib/shaken-required.ts</code>をそのまま組み合わせるだけで、
+        このファイル自身は日付計算やアラート段階の判定ロジックを一切持ちません。
+      </p>
+      <p>
+        <code>shakenRequired(shakenExpiryDate)</code>（＝満了日が設定されているか）で
+        セクション全体をガードしているのが要点です。E2E要件「250cc以下のバイク
+        （満了日なし）に車検UIもアラートも一切出ないこと」を、車両区分では分岐せず
+        満了日の有無だけで満たします。「車検完了を記録」へのリンクも同じガードの
+        内側にあるため、車検を扱わない車両にはこのリンク自体が現れません。
       </p>
     </div>
 
