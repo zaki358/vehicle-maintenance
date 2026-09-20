@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(スマホ幅のナビ／ログアウトボタン崩れを修正、`519f721` でコミット済み。本番未デプロイ)
+最終更新: 2026-09-20(スマホ幅のナビ／ログアウトボタン崩れを修正。`519f721` コミット＋本番デプロイまで完了)
 
 ---
 
@@ -708,7 +708,7 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 （https://vehicle-maintenance.y-kakeibo.workers.dev ）。
 開発環境では招待→パスワード設定→ログインまで実機で成功済み。
 本番でも招待→パスワード設定→ログインを依頼者が実機で確認済み。
-未コミットの変更は無い（`519f721` のナビ修正までコミット済み。ただし `519f721` は本番未デプロイ）。
+未コミットの変更は無い（`519f721` のナビ修正までコミット済み・本番デプロイ済み）。
 
 **次にやること**: 依頼者が実データを入力して使用中。不具合の報告を待つ。
 報告が来たら再現 → `superpowers:systematic-debugging` で原因特定 → 修正。
@@ -730,8 +730,11 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
   320px → バー 44px 維持・ボタン1行のまま・アプリ名のみ `…` で省略、
   481px・768px → 従来どおり（バー 44px / ボタン 82.5×32 / 省略なし）。横スクロール発生なし
 - `docs/src/styles/nav.html` と `docs/src/styles/buttons.html` も更新済み（CLAUDE.md ルール2）
-- **未実施**: `npm run test:coverage` と Playwright E2E は未実行（CSS のみの変更のため）。
-  **本番へのデプロイも未実施** — 次に `npm run deploy` するときに一緒に反映される
+- **本番デプロイ済み** — `npm run deploy` 実行、Version ID `b3508c14-5b18-475a-bf67-f2358a8f4c77`。
+  本番の配信 CSS（`/assets/styles-BaIWR21J.css`）を 375px で実測し、
+  バー 44px / ボタン 65.6×32（font 12px・padding 6px 10px・nowrap）/
+  アプリ名 12px 省略なし / 横スクロールなし を確認
+- **未実施**: `npm run test:coverage` と Playwright E2E は未実行（CSS のみの変更のため）
 
 **保留（依頼者が後回しと判断）**
 - 存在しないURLを開くと TanStack Router 既定の素の `Not Found` が出る。
