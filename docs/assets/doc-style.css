@@ -10,10 +10,33 @@
   --doc-accent: #0969da;
   --doc-code-bg: #f6f8fa;
   --doc-code-fg: #24292f;
+  /* リンクは accent と別トークンにする。accent は見出しの罫線にも使うため、
+     読みやすさのために色を動かしたいときに罫線まで道連れにしない */
+  --doc-link: #0969da;
+  --doc-link-visited: #8250df;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/*
+ * ブラウザ既定のリンク色(#0000EE / 訪問済 #551A8B)は暗い背景の上で
+ * コントラスト比 2.01:1 / 1.72:1 しかなく、WCAG AA の 4.5:1 を大きく下回る。
+ * 全ての a を明示的に塗り、下線は残して色以外の手がかりも確保する。
+ */
+a {
+  color: var(--doc-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+a:visited {
+  color: var(--doc-link-visited);
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
 }
 
 body {
@@ -126,8 +149,10 @@ table.doc-structure code {
     --doc-fg: #e6edf3;
     --doc-muted: #8d96a0;
     --doc-border: #30363d;
-    --doc-accent: #4493f8;
+    --doc-accent: #58a6ff;
     --doc-code-bg: #161b22;
     --doc-code-fg: #e6edf3;
+    --doc-link: #58a6ff;
+    --doc-link-visited: #d2a8ff;
   }
 }
