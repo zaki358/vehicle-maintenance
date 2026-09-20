@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>parse-auth-hash.ts</title>
+<link rel="stylesheet" href="../../../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>parse-auth-hash.ts</h1>
+    <div class="doc-path">src/features/auth/lib/parse-auth-hash.ts</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      招待メール・パスワード再設定メールのリンクを踏んだあと、ブラウザが戻ってくる
+      URL の <code>#</code> 以降（ハッシュフラグメント）を解析する純粋関数です。
+      <code>#access_token=...&amp;refresh_token=...</code> という形でセッションの
+      トークンが渡されるので、それを取り出して <code>/set-password</code> 画面が
+      <code>supabase.auth.setSession()</code> に渡せる形にします。
+    </p>
+    <p>
+      この関数が必要になる理由は、<code>@supabase/ssr</code> の
+      <code>createBrowserClient</code> が <code>flowType</code> を
+      <code>"pkce"</code> に固定しているためです。Supabase ダッシュボードや
+      <code>admin.inviteUserByEmail()</code> が送るメールのリンクは、PKCE ではなく
+      implicit フロー形式（ハッシュにトークンを載せる方式）で戻ってきます。
+      PKCE 固定のクライアントはこの形式を「PKCE の URL ではない」として拒否し、
+      <code>detectSessionInUrl</code> による自動取り込みが働きません。そこで、
+      アプリ側で明示的にハッシュを読み取る必要があります。
+    </p>
+    <p>
+      リンクが期限切れ・使用済みのときは、トークンの代わりに
+      <code>#error=access_denied&amp;error_code=otp_expired&amp;...</code> が付いて
+      戻ってくるため、その場合はエラーコードを返して画面側で案内を出せるように
+      しています。<code>src/**/lib/**</code> の境界ルール（<code>CLAUDE.md</code>）に
+      従い、このファイルは React も Supabase も import しません。入力は文字列、
+      出力はプレーンなオブジェクトだけです。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AuthHashResult</code></td><td>type（export）</td><td>解析結果を表す3択の判別可能ユニオン（トークンあり／エラー／該当なし）</td></tr>
+        <tr><td><code>parseAuthHash</code></td><td>function（export）</td><td>URL ハッシュ文字列を <code>AuthHashResult</code> に変換する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>export type AuthHashResult =
+  | { kind: 'tokens'; accessToken: string; refreshToken: string }
+  | { kind: 'error'; code: string }
+  | { kind: 'none' }</code></pre>
+      <p>
+        戻り値を判別可能ユニオン（discriminated union）にしています。
+        <code>kind</code> を見れば呼び出し側の分岐が尽くされているかを
+        TypeScript が検査できるため、「エラーのときの処理を書き忘れる」
+        といった漏れを型で防げます。
+      </p>
+      <p>
+        3つの状態はそれぞれ、<code>tokens</code> = 有効なリンクから戻ってきた、
+        <code>error</code> = 期限切れなどでリンクが無効だった、
+        <code>none</code> = そもそもメールのリンク経由ではない（直接 URL を
+        開いた、など）を表します。<code>none</code> と <code>error</code> を
+        分けているのは、利用者に出すべき案内文が違うからです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash)</code></pre>
+      <p>
+        ハッシュの中身は <code>a=1&amp;b=2</code> という、クエリ文字列と同じ形式です。
+        そのため <code>URLSearchParams</code> をそのまま使えます。パーセント
+        エンコードの解除（例: <code>Email+link+is+invalid</code>）も任せられます。
+      </p>
+      <p>
+        先頭の <code>#</code> は <code>window.location.hash</code> から取ると付いてきますが、
+        文字列を組み立てて渡す場合は付かないこともあります。どちらでも動くように
+        入口で吸収しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>if (params.has('error') || params.has('error_code')) {
+  return { kind: 'error', code: params.get('error_code') || 'unknown' }
+}</code></pre>
+      <p>
+        エラー判定をトークン取得より先に行います。Supabase は失敗時に
+        <code>error</code> / <code>error_code</code> / <code>error_description</code> を
+        返し、トークンは付けません。
+      </p>
+      <p>
+        <code>error_code</code> が無いエラー（将来の仕様変更や想定外のケース）は
+        <code>'unknown'</code> にまとめます。呼び出し側は
+        <code>authErrorMessage()</code> に渡すだけでよく、未知のコードは
+        自動的に汎用メッセージへ落ちます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>const accessToken = params.get('access_token')
+const refreshToken = params.get('refresh_token')
+if (!accessToken || !refreshToken) {
+  return { kind: 'none' }
+}
+return { kind: 'tokens', accessToken, refreshToken }</code></pre>
+      <p>
+        2つのトークンが<strong>両方そろっている場合だけ</strong>
+        <code>tokens</code> を返します。<code>setSession()</code> は
+        <code>access_token</code> と <code>refresh_token</code> の両方を要求し、
+        片方だけでは必ず失敗するためです。片方しか無い中途半端な状態は、
+        呼び出し側から見れば「リンク経由ではない」のと同じ扱いで問題ありません。
+      </p>
+      <p>
+        <code>!accessToken</code> という真偽値チェックにしているのは、
+        <code>null</code>（キーが無い）に加えて空文字（<code>access_token=</code>）も
+        同時に弾くためです。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/auth/lib/parse-auth-hash.ts
+  </footer>
+
+</div>
+</body>
+</html>

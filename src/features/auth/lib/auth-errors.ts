@@ -38,6 +38,8 @@ export function authErrorMessage(error: AuthErrorLike): string {
       return 'パスワードが簡単すぎます。別のパスワードを設定してください'
     case 'same_password':
       return '新しいパスワードは現在のパスワードと異なるものにしてください'
+    case 'otp_expired':
+      return 'メールのリンクが無効か期限切れです。もう一度メールを送ってもらってください'
     default:
       return GENERIC_MESSAGE
   }

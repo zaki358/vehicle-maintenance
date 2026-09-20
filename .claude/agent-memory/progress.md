@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-19(Phase 9 完了。全フェーズ完了。本番デプロイ済み: https://vehicle-maintenance.y-kakeibo.workers.dev )
+最終更新: 2026-09-20(招待/再設定リンクからのパスワード設定の不具合を修正。開発環境で実ログイン成功)
 
 ---
 
@@ -384,6 +384,68 @@ Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正�
 - [x] **`npm run lint` / `tsc --noEmit` / `npm run test:coverage`(288テスト全通過) /
       `npm run build` 全て green** — Phase 7完了
 
+### 2026-09-20（招待/再設定リンクからのパスワード設定の修正）
+
+- [x] **`/set-password`が機能していなかった不具合を修正** — 依頼者が開発環境で初めて
+      招待メール経由のログインを試したところ、ログイン画面に飛ばされる／
+      「エラーが発生しました」になる、という形で発覚。原因は2つ重なっていた:
+  - **原因1: Site URLの設定** — 開発用Supabase（`rldmmiyhlnasghubigua`）の
+    Auth → URL Configuration の Site URL が `http://localhost:3000`（パスなし）だった。
+    ダッシュボードから送る招待/再設定メールは redirect_to を指定できず Site URL に飛ぶため、
+    `/`（`_authed`配下）に着地 → ハッシュはサーバーに送られないので未ログイン判定 →
+    `/login`へリダイレクト、となっていた。**Site URLを`http://localhost:3000/set-password`に変更**
+    （Redirect URLsは空のまま。Site URL自体は常に許可されるため）。
+    **本番用プロジェクト（`wwvuxjvcwntqzdvyezss`）のSite URLは未変更**。本番で招待を使うときは
+    本番ドメインの`/set-password`に設定し直すこと
+  - **原因2: PKCE固定とimplicitハッシュの不整合（コードの不具合）** — `@supabase/ssr`の
+    `createBrowserClient`は`flowType: "pkce"`を**上書き不可で固定**している
+    （`node_modules/@supabase/ssr/dist/module/createBrowserClient.js:41`）。一方、
+    ダッシュボード/`inviteUserByEmail`のリンクは`#access_token=...`のimplicit形式で戻るため、
+    auth-jsの`_getSessionFromURL`が`Not a valid PKCE flow url`として**拒否**する
+    （`GoTrueClient.js:3257`）。`set-password.tsx`の旧実装は`detectSessionInUrl`が
+    両形式を自動検出する前提（Phase 4の「判断の記録」に書いた前提）だったが、
+    **その前提は成り立っていなかった**。修正: ハッシュを自前で解析し`setSession()`で
+    明示的にセッションを確立する方式へ変更
+- [x] **`src/features/auth/lib/parse-auth-hash.ts` 新規作成（TDD）** — `parseAuthHash`。
+      ハッシュを`{kind:'tokens'|'error'|'none'}`の判別可能ユニオンに変換する純粋関数。7テスト
+- [x] **`src/features/auth/lib/auth-errors.ts` に`otp_expired`を追加** — リンク失効時の案内文。1テスト追加
+- [x] **`src/routes/set-password.tsx` 書き換え** — マウント時に`establishSession()`で
+      セッション確立 → 成功時のみフォーム表示（`checking`/`ready`/`unavailable`の3状態）。
+      読み取り後`history.replaceState`でURLからトークンを消す。ハッシュが無い場合は
+      既存セッションを確認してから判断
+- [x] **解説ドキュメント生成/更新** — `docs/src/features/auth/lib/parse-auth-hash.html`（新規）、
+      `docs/src/routes/set-password.html`（全面改稿）、
+      `docs/src/features/auth/lib/auth-errors.html`（`otp_expired`の節を追記）
+- [x] **`code-reviewer`の指摘2件を修正** —
+  - **HIGH: StrictModeの二重実行によるレース** — 開発時のみ`useEffect`が2回走り、
+    1回目がハッシュを消すため2回目は`kind:'none'`→`getSession()`経路に入る。
+    `@supabase/ssr`は`auth.lock`を渡さないためauth-jsはロック無し経路を取り、
+    ネットワーク往復のある`setSession()`より先に軽い`getSession()`が解決しうる
+    （＝有効なリンクなのに「リンクから開いてください」と表示される）。
+    `cancelled`フラグは結果を捨てるだけで二重実行自体は防げないため、
+    `useRef`の実行ガードに変更した
+  - **MEDIUM: `setSession()`の戻り値`data.session`未チェック** — 期限切れトークンの
+    リフレッシュ失敗時に`error`なしで`session`だけ`null`になる分岐がある
+    （`GoTrueClient.js:3035-3044`）。この場合フォームを出してしまい、送信して初めて
+    分かりにくいエラーになるため、`data.session`も見て期限切れ扱いにした
+- [x] **検証** — `npm run lint`/`npm run typecheck`エラー0、`npx vitest run`で50ファイル・302テスト全通過。
+      ブラウザ（ポート3101）で「リンクなし」「期限切れリンク」「不正トークン」の3系統を確認。
+      **有効な実リンクでの成功は依頼者の実機確認で確認済み**（パスワード設定→ログイン成功）
+- **判明した運用上の落とし穴: メールのリンクは他端末に先に開かれるとその時点で失効する。**
+  Supabaseの認証/APIログで、送信17秒後に**iPhoneのBrave**から`/verify`が成功し
+  （＝使い捨てトークンを消費）、そのあとのPC Chromeからのアクセスが全て
+  `One-time token not found`になっていたことを確認した。依頼者は「PCで1回しかクリックしていない」
+  とのことで、iPhone側のメールアプリのプレビュー等が先に開いた可能性が高い。
+  **リンク先が`localhost:3000`なのでiPhone側では何も表示されず、トークンだけが消える。**
+  次回以降、メールリンクが期限切れになる現象が起きたら、まずAuth Logs/Edge Logsの
+  ユーザーエージェントを確認すること（`/logs/edge-logs`で`user_agent`が見られる）
+- **Supabase標準メールの送信レート制限は1時間あたり2通**。招待→再設定→再送で上限に達し
+  `429`で送信できなくなった（ダッシュボードには「Failed to send password recovery」とだけ出る）。
+  自前SMTPを設定しない限り変更できず、メールテンプレートの編集も同様にSMTPが必要
+- [ ] **未着手: 本番でのリンク先読み対策** — 恒久対策は、メールテンプレートを`token_hash`方式
+      （リンクを開いただけでは消費せず、画面のボタン押下で`verifyOtp`）に変えること。
+      **カスタムSMTPの設定が前提**なので、依頼者と相談してから着手する
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -452,9 +514,11 @@ Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正�
 - **招待メール（`inviteUserByEmail`）はPKCE非対応と判明。** Supabase公式ドキュメントが
   「招待する側とリンクを踏む側でブラウザが異なるため」と明記。そのため招待リンクは
   `?code=`ではなく`#access_token=...&type=invite`のハッシュフラグメント形式になる。
-  `set-password.tsx`はブラウザ用クライアントの`detectSessionInUrl`（デフォルトtrue）が
-  どちらの形式も自動検出する前提で実装しており、専用のサーバー側コールバックルートは
-  作っていない
+  ~~`set-password.tsx`はブラウザ用クライアントの`detectSessionInUrl`（デフォルトtrue）が
+  どちらの形式も自動検出する前提で実装~~ → **2026-09-20に誤りと判明。**
+  `@supabase/ssr`は`flowType: "pkce"`を上書き不可で固定するため、implicit形式のハッシュは
+  `detectSessionInUrl`に拒否される。ハッシュを自前で解析して`setSession()`を呼ぶ方式に修正済み
+  （詳細は上記「2026-09-20」の節）。専用のサーバー側コールバックルートは今も作っていない
 - **スキャフォールドのプレースホルダー`src/routes/index.tsx`（「Welcome to TanStack Start」）を
   削除した。** 理由: 新設した`src/routes/_authed.index.tsx`（ログイン後の仮ホーム画面）も
   URL `/`を指すため、両方存在するとルート定義が衝突する。ダッシュボード本体はPhase 7で
@@ -528,18 +592,23 @@ Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正�
 
 **Phase 9 完了。全フェーズ完了。**
 
-- 依頼者が実際のアカウントでの本番ログインを確認する（未実施）
-- `docs/index.html`（このセッションでの変更、未コミット）をコミットするかどうか依頼者に確認する
+- `/set-password`の修正一式（`parse-auth-hash.ts`/`auth-errors.ts`/`set-password.tsx`＋docs）と
+  `docs/index.html`をコミットするかどうか依頼者に確認する（いずれも未コミット）
+- **本番で招待を使う前に、本番用Supabase（`wwvuxjvcwntqzdvyezss`）のSite URLを
+  `https://vehicle-maintenance.y-kakeibo.workers.dev/set-password`に変更する**（未実施）
+- 依頼者が実際のアカウントでの本番ログインを確認する（未実施。開発環境では成功済み）
+- メールリンクの先読み対策（`token_hash`方式＋カスタムSMTP）は依頼者と相談してから
 - 見送った指摘（Phase 8参照）や`date-fns`の`package.json`からの削除も、依頼者の判断待ち
 
 ## 次のセッションで最初にやること
 
-このファイルを読んだら、`npm run test:coverage` を実行して現状の 294 テストが
+このファイルを読んだら、`npm run test:coverage` を実行して現状の 302 テストが
 全て通り、カバレッジが崩れていないことを確認する
 （要承認だが事前承認済みのコマンドなので確認だけで進めてよい）。
 **中断時点**: 全フェーズ（0〜9）完了・本番デプロイ済み
-（https://vehicle-maintenance.y-kakeibo.workers.dev ）。`docs/index.html`が未コミット
-（セッション開始時点で既に存在していたファイルを、このセッションでプロジェクト全体解説ページへ拡張）。
+（https://vehicle-maintenance.y-kakeibo.workers.dev ）。
+開発環境では招待→パスワード設定→ログインまで実機で成功済み。
+未コミットの変更: `/set-password`修正一式（上記2026-09-20の節）と`docs/index.html`。
 コミットするかどうか依頼者に確認すること。
 
 ---

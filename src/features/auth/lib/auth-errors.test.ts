@@ -75,6 +75,12 @@ describe('authErrorMessage', () => {
     )
   })
 
+  it('otp_expired はメールリンクの期限切れ案内にする', () => {
+    expect(authErrorMessage({ code: 'otp_expired', message: 'Email link is invalid or has expired' })).toBe(
+      'メールのリンクが無効か期限切れです。もう一度メールを送ってもらってください',
+    )
+  })
+
   it('未知の code は汎用エラーメッセージにする', () => {
     expect(authErrorMessage({ code: 'unexpected_failure', message: 'boom' })).toBe(
       'エラーが発生しました。時間をおいて再度お試しください',
