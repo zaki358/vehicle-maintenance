@@ -152,7 +152,9 @@ table.doc-structure code {
     --doc-accent: #58a6ff;
     --doc-code-bg: #161b22;
     --doc-code-fg: #e6edf3;
-    --doc-link: #58a6ff;
+    /* 背景(#0d1117)が青みを帯びているため、リンクの青は明度を上げて
+       色相の近さを補う。#58a6ff(7.5:1) では「青地に青」で沈んで見えた */
+    --doc-link: #a5d6ff;
     --doc-link-visited: #d2a8ff;
   }
 }

@@ -18,17 +18,24 @@
     padding: 0;
     list-style: none;
   }
+  /* ピルとカード見出しは「リンクだから青」にしない。一覧は要素の大半が
+     リンクなので、色を付けると画面が青一色になって逆に読めなくなる。
+     押せることは枠線とホバーで示す。 */
   .index-nav a {
     display: inline-block;
     font-size: 0.82rem;
-    color: var(--doc-accent);
+    color: var(--doc-fg);
     text-decoration: none;
     border: 1px solid var(--doc-border);
     border-radius: 999px;
     padding: 0.25rem 0.75rem;
   }
+  .index-nav a:visited {
+    color: var(--doc-fg);
+  }
   .index-nav a:hover {
     background: var(--doc-code-bg);
+    border-color: var(--doc-accent);
   }
   .index-group-desc {
     color: var(--doc-muted);
@@ -56,7 +63,7 @@
   .index-card-title {
     font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     font-size: 0.92rem;
-    color: var(--doc-accent);
+    color: var(--doc-fg);
     word-break: break-all;
   }
   .index-card-path {
@@ -71,7 +78,7 @@
     color: var(--doc-muted);
   }
   .index-note a {
-    color: var(--doc-accent);
+    color: var(--doc-link);
   }
   .feature-list {
     margin: 0;
