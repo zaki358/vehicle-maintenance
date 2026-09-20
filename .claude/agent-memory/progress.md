@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(ホーム画面アイコン対応。apple-touch-icon / Web App Manifest / favicon を追加)
+最終更新: 2026-09-20(ホーム画面アイコン一式をコミット `827ca7b`。本番での招待→ログインも確認済み)
 
 ---
 
@@ -693,8 +693,6 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 - 適用後に `npm run deploy` で本番へデプロイする
 - 本番で招待 → パスワード設定 → ログインを通しで確認する（開発環境では成功済み）
 
-- `/set-password`の修正一式（`parse-auth-hash.ts`/`auth-errors.ts`/`set-password.tsx`＋docs）と
-  `docs/index.html`をコミットするかどうか依頼者に確認する（いずれも未コミット）
 - **本番で招待を使う前に、本番用Supabase（`wwvuxjvcwntqzdvyezss`）のSite URLを
   `https://vehicle-maintenance.y-kakeibo.workers.dev/set-password`に変更する**（未実施）
 - 依頼者が実際のアカウントでの本番ログインを確認する（未実施。開発環境では成功済み）
@@ -709,9 +707,16 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 **中断時点**: 全フェーズ（0〜9）完了・本番デプロイ済み
 （https://vehicle-maintenance.y-kakeibo.workers.dev ）。
 開発環境では招待→パスワード設定→ログインまで実機で成功済み。
-未コミットの変更: `/set-password`修正一式（上記2026-09-20の節）と`docs/index.html`、
-およびホーム画面アイコン一式（`public/` `tools/` `image/` `src/routes/__root.tsx`）。
-コミットするかどうか依頼者に確認すること。
+本番でも招待→パスワード設定→ログインを依頼者が実機で確認済み。
+未コミットの変更は無い（`827ca7b` でホーム画面アイコン一式までコミット済み）。
+
+**次にやること**: 依頼者が実データを入力して使用中。不具合の報告を待つ。
+報告が来たら再現 → `superpowers:systematic-debugging` で原因特定 → 修正。
+着手待ちの既知の課題は 404 ページのみ（下記「保留」）。
+
+**保留（依頼者が後回しと判断）**
+- 存在しないURLを開くと TanStack Router 既定の素の `Not Found` が出る。
+  `notFoundComponent` でデザインに合わせた日本語の404ページを用意する
 
 **ホーム画面アイコンは本番へデプロイ済み**。iPhone 側で既にホーム画面に追加済みの場合、
 **一度削除して追加し直さないと古いアイコンがキャッシュされたまま**になる点に注意。
