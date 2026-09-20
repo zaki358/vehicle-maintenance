@@ -23,8 +23,10 @@ import type { Database } from '../src/lib/supabase/database.types.ts'
  *
  * `supabase.auth.admin.inviteUserByEmail()` は PKCE 非対応（招待する側と
  * リンクを踏む側でブラウザが異なるため）。招待メールのリンクは実装時の調査どおり
- * `#access_token=...&type=invite` 形式になり、`routes/set-password.tsx` の
- * ブラウザ用クライアントがこれを自動検出してセッションを確立する。
+ * `#access_token=...&type=invite` 形式になる。`@supabase/ssr` のブラウザ用
+ * クライアントは flowType が pkce 固定でこの形式を自動検出しないため、
+ * `routes/set-password.tsx` が `parseAuthHash` で自前に解析し、
+ * `setSession()` でセッションを確立する。
  */
 
 const PRODUCTION_HOST = 'wwvuxjvcwntqzdvyezss.supabase.co'

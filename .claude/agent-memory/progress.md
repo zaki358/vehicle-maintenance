@@ -736,6 +736,18 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
   アプリ名 12px 省略なし / 横スクロールなし を確認
 - **未実施**: `npm run test:coverage` と Playwright E2E は未実行（CSS のみの変更のため）
 
+**`docs/architecture.html` を新設（2026-09-20）**: 依頼者から「アプリがどう動いているか
+（DB アクセス経路・Cloudflare と Supabase の通信・招待フロー）を知りたい」という質問を受け、
+口頭説明した内容を docs に残したもの。ファイル単位ではなく**動作の流れ**で説明するページ。
+
+- 構成: 全体構成 / デプロイ成果物 / DB アクセス経路 / RLS が安全性の境界である理由 /
+  認証と Cookie（2つのクライアント）/ **招待フロー全体像** / 車検 RPC / Workers 固有の制約
+- `docs/index.html` のナビと冒頭から相互リンク済み。内部リンク9件はファイル存在を確認済み
+- **ついでに `scripts/invite-user.ts` のコメントの誤りを訂正**——「ブラウザ用クライアントが
+  自動検出してセッションを確立する」と書かれていたが、実際は `@supabase/ssr` が
+  flowType を pkce 固定にしているため自動検出は働かず、`set-password.tsx` が
+  `parseAuthHash` で自前解析して `setSession()` している。コメントだけが実装と食い違っていた
+
 **保留（依頼者が後回しと判断）**
 - 存在しないURLを開くと TanStack Router 既定の素の `Not Found` が出る。
   `notFoundComponent` でデザインに合わせた日本語の404ページを用意する

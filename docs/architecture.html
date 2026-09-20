@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アーキテクチャ解説 — 車両メンテナンス記録</title>
+<link rel="stylesheet" href="assets/doc-style.css">
+<style>
+  .arch-lead {
+    color: var(--doc-muted);
+    margin: 0.25rem 0 0;
+  }
+  .arch-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .arch-nav a {
+    display: inline-block;
+    font-size: 0.82rem;
+    color: var(--doc-accent);
+    text-decoration: none;
+    border: 1px solid var(--doc-border);
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+  }
+  .arch-nav a:hover {
+    background: var(--doc-code-bg);
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 0.88rem;
+    background: var(--doc-code-bg);
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+  }
+  .doc-section p {
+    margin: 0.7rem 0;
+  }
+  .doc-section ul {
+    margin: 0.6rem 0;
+    padding-left: 1.2rem;
+  }
+  .doc-section ul li {
+    margin: 0.35rem 0;
+  }
+  .arch-diagram {
+    background: var(--doc-code-bg);
+    border: 1px solid var(--doc-border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    white-space: pre;
+    margin: 1rem 0;
+  }
+  .callout {
+    border-left: 4px solid var(--doc-accent);
+    background: var(--doc-code-bg);
+    border-radius: 0 6px 6px 0;
+    padding: 0.75rem 1rem;
+    margin: 1.1rem 0;
+  }
+  .callout p {
+    margin: 0.3rem 0;
+  }
+  .callout-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .callout-warn {
+    border-left-color: #bf8700;
+  }
+  .step-list {
+    margin: 0;
+    padding-left: 1.3rem;
+  }
+  .step-list > li {
+    margin: 0.7rem 0;
+  }
+  .doc-footer a {
+    color: var(--doc-accent);
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>アーキテクチャ解説</h1>
+    <div class="doc-path">Cloudflare Workers と Supabase がどう繋がり、どうデータベースへ届くか</div>
+    <p class="arch-lead">
+      このページは「アプリが動いている仕組み」をファイル単位ではなく<strong>流れ</strong>で説明します。
+      個々のファイルの解説は <a href="index.html">プロジェクト解説（目次）</a> から辿れます。
+    </p>
+    <ul class="arch-nav">
+      <li><a href="#topology">全体構成</a></li>
+      <li><a href="#deployed">デプロイされる物</a></li>
+      <li><a href="#db">DBアクセスの経路</a></li>
+      <li><a href="#rls">安全性の境界</a></li>
+      <li><a href="#auth">認証とCookie</a></li>
+      <li><a href="#invite">招待フロー</a></li>
+      <li><a href="#rpc">トランザクション</a></li>
+      <li><a href="#workers">Workers固有の制約</a></li>
+    </ul>
+  </header>
+
+  <section class="doc-section" id="topology">
+    <h2>全体構成 — 2つのクラウドが HTTPS だけで繋がっている</h2>
+
+    <div class="arch-diagram">   ブラウザ (iPhone / PC)
+        │  ① HTTPS
+        ▼
+ ┌──────────────────────────────┐        ┌──────────────────────────┐
+ │  Cloudflare Workers          │   ③    │  Supabase                │
+ │  vehicle-maintenance         │───────▶│  ・Auth (JWT 発行)        │
+ │  ・SSR (HTML を組み立てる)    │  HTTPS │  ・PostgREST (REST API)  │
+ │  ・サーバー関数 (実 API の入口)│◀───────│  ・PostgreSQL + RLS      │
+ │  ・静的アセット配信           │        └──────────────────────────┘
+ └──────────────────────────────┘</div>
+
+    <p>
+      重要なのは <strong>③ が特別な接続ではない</strong>ことです。専用線も VPC ピアリングもなく、
+      Worker が公開インターネット経由で <code>https://&lt;プロジェクト&gt;.supabase.co</code> へ
+      <strong>普通の HTTPS リクエストを投げているだけ</strong>です。Supabase 側から見れば
+      「どこかのサーバーから来た API 呼び出し」であり、Cloudflare だから特別扱い、ということは一切ありません。
+    </p>
+    <p>
+      Postgres へのコネクションプールも張っていません。Workers には常時接続を維持する仕組みが無いため、
+      この「REST 経由で DB を触る」構成が選ばれています。
+    </p>
+  </section>
+
+  <section class="doc-section" id="deployed">
+    <h2>デプロイされる物の中身</h2>
+
+    <p>
+      <code>npm run deploy</code>（<code>vite build</code> → <code>wrangler deploy</code>）で本番に上がるのは2種類です。
+      <code>vite.config.ts</code> の <code>@cloudflare/vite-plugin</code> が生成します。
+    </p>
+
+    <table class="doc-structure">
+      <thead>
+        <tr><th>成果物</th><th>中身</th><th>配信のされ方</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>dist/server/index.js</code></td>
+          <td>Worker 本体。SSR とサーバー関数が入っている</td>
+          <td>リクエストのたびに実行される</td>
+        </tr>
+        <tr>
+          <td><code>dist/client/</code></td>
+          <td>JS・CSS・アイコンなどの静的ファイル</td>
+          <td>Workers Assets として、<strong>Worker のコードを起動せずに</strong>返される</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      静的配信の設定はリポジトリの <code>wrangler.jsonc</code> には書かれていません。ビルド時に
+      <code>dist/server/wrangler.json</code> が生成され、その中に
+      <code>"assets": { "directory": "../client" }</code> が入ります。
+      手書きの <code>wrangler.jsonc</code> に書いてあるのは、名前・互換性日付・
+      <code>nodejs_compat</code> フラグ・エントリポイントだけです。
+    </p>
+  </section>
+
+  <section class="doc-section" id="db">
+    <h2>データベースへのアクセス経路</h2>
+
+    <p>
+      <code>.from('vehicles')</code> は「DB に直接つなぐ」のではなく、
+      <strong>PostgREST への HTTPS リクエストに変換される</strong>のが肝です。
+      車両一覧 <code>/vehicles</code> を開いたときの実際の流れ:
+    </p>
+
+    <div class="arch-diagram">① ブラウザ  →  Worker            GET /vehicles          (Cookie 添付)
+② _authed.tsx の beforeLoad で getSessionFn() → ログイン判定
+③ ルートの loader が listVehiclesFn() を呼ぶ
+④ Worker  →  Supabase PostgREST
+     GET https://&lt;proj&gt;.supabase.co/rest/v1/vehicles?select=*&amp;order=created_at
+     apikey:        &lt;publishable key&gt;
+     Authorization: Bearer &lt;ユーザーの JWT&gt;
+⑤ Postgres が RLS を適用して「その人の行だけ」返す
+⑥ Worker が HTML を組み立ててブラウザへ返す</div>
+
+    <p>
+      該当コードは <a href="src/features/vehicles/server/list.html"><code>features/vehicles/server/list.ts</code></a> です。
+      ここで目を引くのは <strong><code>user_id</code> で絞り込んでいない</strong>ことで、これは意図的です。
+      絞り込みは RLS が DB 側で強制するため、アプリ側にも書くと
+      「ポリシーが本当に効いているか」をアプリのフィルタが隠してしまうからです。
+    </p>
+
+    <div class="callout">
+      <p class="callout-title">サーバー関数は「関数」ではなく実 HTTP エンドポイント</p>
+      <p>
+        ②③ の <code>getSessionFn</code> / <code>listVehiclesFn</code> は <code>createServerFn</code> で作られており、
+        見た目は関数呼び出しですが実体は HTTP エンドポイントです。クライアントの JS を書き換えて
+        直接叩けるため、フォーム側の検証は信用できません。だから
+        <strong>全書き込みはサーバー関数の入口で Zod 検証する</strong>というルールになっています。
+      </p>
+    </div>
+  </section>
+
+  <section class="doc-section" id="rls">
+    <h2>安全性の境界は RLS であって、アプリのコードではない</h2>
+
+    <div class="doc-chunk">
+      <pre><code>alter table public.vehicles enable row level security;
+revoke all on public.vehicles from anon;
+grant select, insert, update, delete on public.vehicles to authenticated;
+
+create policy "vehicles_update_own" on public.vehicles for update to authenticated
+  using       ((select auth.uid()) = user_id)
+  with check  ((select auth.uid()) = user_id);</code></pre>
+      <p>
+        <code>auth.uid()</code> は、リクエストに添えられた <strong>JWT の中身から Postgres が取り出す値</strong>です。
+        つまり「誰であるか」の判定は最終的に DB の中で行われます。
+      </p>
+    </div>
+
+    <p>この設計の帰結:</p>
+    <ul>
+      <li>
+        <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> がブラウザの JS に埋め込まれて
+        <strong>公開されていても問題ない</strong>。この鍵は「どのプロジェクトか」を示すだけで、
+        権限は JWT 側が決める
+      </li>
+      <li>
+        <code>service_role</code>（RLS を無視できる万能鍵）はアプリ側のどこにも存在しない。
+        使うのはローカル実行の招待スクリプトだけ
+      </li>
+      <li>
+        <a href="src/features/auth/require-user.html"><code>require-user.ts</code></a> のガードは
+        <strong>あくまで UX のため</strong>。迂回して直接リクエストされても RLS が他人のデータを返さない
+      </li>
+    </ul>
+
+    <div class="callout callout-warn">
+      <p class="callout-title">using と with check の両方が必要な理由</p>
+      <p>
+        <code>using</code> だけだと、自分の行の <code>user_id</code> を他人の ID に書き換えて
+        <strong>行ごと他人に譲渡できてしまいます</strong>。RLS で最も多いミスなので、
+        UPDATE ポリシーには必ず両方を書きます。
+      </p>
+    </div>
+  </section>
+
+  <section class="doc-section" id="auth">
+    <h2>認証と Cookie — 2つの Supabase クライアント</h2>
+
+    <table class="doc-structure">
+      <thead>
+        <tr><th></th><th>ブラウザ用</th><th>サーバー用</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ファイル</td>
+          <td><a href="src/integrations/supabase/client.html"><code>integrations/supabase/client.ts</code></a></td>
+          <td><a href="src/integrations/supabase/server.html"><code>integrations/supabase/server.ts</code></a></td>
+        </tr>
+        <tr>
+          <td>生成</td>
+          <td>シングルトン（使い回す）</td>
+          <td><strong>毎回作り直す</strong></td>
+        </tr>
+        <tr>
+          <td>出番</td>
+          <td>招待リンクからのパスワード設定のみ</td>
+          <td>通常の全データ操作</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+      <p class="callout-title">サーバー用をメモ化してはいけない</p>
+      <p>
+        Cloudflare Workers は isolate を複数リクエストで再利用します。サーバー用クライアントを
+        モジュールスコープにキャッシュすると、<strong>前のリクエストの人のセッションを次の人が引き継ぎます</strong>。
+        ローカル開発でもテスター1人でも絶対に再現しない種類のバグです。
+      </p>
+    </div>
+
+    <p>
+      ログイン処理（<a href="src/features/auth/server/login.html"><code>auth/server/login.ts</code></a>）は
+      <code>signInWithPassword()</code> を呼ぶだけで、Cookie を一切触っていません。
+      <code>createServerClient</code> に渡した <code>cookies.setAll</code> を Supabase 側が呼ぶため、
+      Cookie の書き込みは自動です。ログアウト時の削除も同じ仕組みです。
+    </p>
+    <p>
+      セッション確認に <code>getSession()</code> ではなく <code>getClaims()</code> を使うのも意図的です。
+      前者は Cookie の値をそのまま信じますが、後者は JWT の署名を検証します
+      （非対称鍵なら WebCrypto でローカル検証＝ネットワーク往復ゼロ）。
+    </p>
+  </section>
+
+  <section class="doc-section" id="invite">
+    <h2>招待フローの全体像</h2>
+
+    <p>
+      このアプリに<strong>一般公開のサインアップ画面はありません</strong>。利用者はオーナーが
+      1人ずつ招待します。招待はブラウザからではなく、オーナーの PC で実行するローカル専用スクリプトで行います。
+    </p>
+
+    <div class="arch-diagram">┌── オーナーの PC ─────────────────────────────┐
+│ node scripts/invite-user.ts <メール> <遷移先URL> │
+│   ・scripts/.env の SUPABASE_SECRET_KEY を読む   │
+│   ・admin.inviteUserByEmail(email, {redirectTo}) │
+└───────────────────┬─────────────────────────┘
+                    │ ① HTTPS (secret key)
+                    ▼
+            ┌──────────────────┐
+            │ Supabase Auth    │  ② auth.users に未確定ユーザーを作成
+            │                  │  ③ 招待メールを送信
+            └────────┬─────────┘
+                     │ ④ 利用者がメールのリンクを踏む
+                     ▼
+   https://.../set-password#access_token=...&refresh_token=...&type=invite
+                     │
+                     │ ⑤ ハッシュ(#以降)はサーバーに送られない
+                     ▼
+            ┌──────────────────────────────┐
+            │ ブラウザ (set-password ページ) │
+            │  ⑥ parseAuthHash でトークン抽出 │
+            │  ⑦ history.replaceState で URL から消す │
+            │  ⑧ setSession() でセッション確立 │
+            │  ⑨ updateUser({password}) で設定 │
+            └───────────┬──────────────────┘
+                        │ ⑩ navigate('/')
+                        ▼
+                  ダッシュボード（ログイン済み）</div>
+
+    <h3>① オーナー側 — 招待スクリプト</h3>
+    <p>
+      <code>scripts/invite-user.ts</code> は <strong>このプロジェクトで唯一 secret key を使う場所</strong>で、
+      オーナーの PC 以外では動きません（<code>scripts/.env</code> は <code>.gitignore</code> 対象）。
+      デプロイされる Worker にはこの鍵は含まれません。
+    </p>
+    <p>
+      スクリプトは実行時に招待先が「開発用」か「本番」かを URL から判定して表示します。
+      第2引数で渡す遷移先 URL は、Supabase ダッシュボードの
+      <strong>Authentication → URL Configuration → Redirect URLs に登録されていないと機能しません</strong>
+      （登録外の URL はリンクの遷移先として拒否されます）。
+    </p>
+
+    <h3>④⑤ なぜトークンが <code>#</code> の後ろに付くのか</h3>
+    <p>
+      招待・パスワード再設定のリンクは <strong>implicit フロー形式</strong>で戻ってきます。
+      つまりトークンが URL のハッシュフラグメントに載ります。
+    </p>
+    <p>
+      ハッシュは仕様上<strong>ブラウザからサーバーへ送信されません</strong>。この性質が、
+      設計上2つの重要な帰結を生んでいます。
+    </p>
+    <ul>
+      <li>
+        <strong>サーバー関数を経由できない</strong> — Worker にはトークンが届かないので、
+        セッション確立はブラウザ側でやるしかない。ここだけブラウザ用クライアントを使う理由がこれ
+      </li>
+      <li>
+        <strong><code>set-password</code> は <code>_authed</code> 配下に置けない</strong> —
+        サーバー側のガードが「未ログイン」と判定して <code>/login</code> へ飛ばしてしまうため、
+        認証不要のルートとして独立させている
+      </li>
+    </ul>
+
+    <h3>⑥ なぜ手動でハッシュを解析するのか</h3>
+    <p>
+      Supabase SDK には <code>detectSessionInUrl</code> という自動検出の仕組みがありますが、
+      <strong>この構成では効きません</strong>。<code>@supabase/ssr</code> の
+      <code>createBrowserClient</code> は flowType を <code>pkce</code> に固定しており、
+      implicit 形式のハッシュを「PKCE の URL ではない」として拒否するためです。
+    </p>
+    <p>
+      そこで <a href="src/features/auth/lib/parse-auth-hash.html"><code>auth/lib/parse-auth-hash.ts</code></a> が
+      ハッシュを自前で解析し、結果を3つの状態に分類します。
+      この関数はブラウザ API も SDK も呼ばない純粋関数なので、単体テストで全分岐を検証できます。
+    </p>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>判定結果</th><th>意味</th><th>画面の挙動</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>tokens</code></td><td>access/refresh トークンが揃っている</td><td><code>setSession()</code> を実行しフォームを表示</td></tr>
+        <tr><td><code>error</code></td><td><code>error_code</code> が付いて戻ってきた</td><td>日本語のエラー文言を表示</td></tr>
+        <tr><td><code>none</code></td><td>ハッシュにトークンが無い</td><td>既存セッションを確認し、無ければ案内を表示</td></tr>
+      </tbody>
+    </table>
+
+    <h3>⑦ トークンをすぐ URL から消す</h3>
+    <div class="doc-chunk">
+      <pre><code>if (parsed.kind !== 'none') {
+  // トークンを URL に残さない（履歴・画面共有・Referer からの漏洩を防ぐ）
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+}</code></pre>
+      <p>
+        解析した直後にアドレスバーから消します。ブラウザ履歴に残る、スクリーンショットや
+        画面共有に写り込む、といった経路でトークンが漏れるのを防ぐためです。
+      </p>
+    </div>
+
+    <h3>⑧⑨ セッション確立とパスワード設定</h3>
+    <p>
+      <code>setSession()</code> が成功すると Cookie にセッションが書かれます。ここで
+      <strong>Cookie を <code>httpOnly</code> にしていない設計</strong>が効いてきます。ブラウザ側の JS で
+      確立したセッションが、そのままサーバー関数からも読めるためです
+      （代わりに <code>secure</code> を明示して平文 HTTP での送信を防いでいます）。
+    </p>
+    <p>
+      なお <code>setSession()</code> は、期限切れトークンのリフレッシュに失敗したとき
+      <strong><code>error</code> が無いまま <code>session</code> だけ <code>null</code> になる</strong>ことがあります。
+      そのため戻り値の <code>session</code> の有無まで確認し、
+      「リンクが期限切れです」と案内するようにしています。
+    </p>
+    <p>
+      パスワードは8文字以上・確認欄との一致をチェックしたうえで <code>updateUser({ password })</code> で設定し、
+      成功したらダッシュボードへ遷移します。この時点で既にログイン済みなので、
+      改めてログイン画面を通す必要はありません。
+    </p>
+
+    <h3>開発時の落とし穴 — StrictMode の二重実行</h3>
+    <div class="doc-chunk">
+      <pre><code>// 開発時の StrictMode は effect を2回実行する。1回目がハッシュを消すため、
+// 2回目は「リンク経由ではない」と誤判定してしまう。実行自体を1回に絞る。
+const startedRef = useRef(false)</code></pre>
+      <p>
+        ⑦ で URL からトークンを消すため、effect が2回走ると2回目には読むものが無くなります。
+        <code>useRef</code> のフラグで初回だけ実行するようにして回避しています。
+      </p>
+    </div>
+
+    <h3>エラー文言の出し分け方</h3>
+    <p>
+      <a href="src/features/auth/lib/auth-errors.html"><code>auth/lib/auth-errors.ts</code></a> が
+      Supabase のエラーコードを日本語に変換します。ここで
+      <code>invalid_credentials</code> と <code>user_not_found</code> を
+      <strong>あえて同じ文言</strong>にしているのは、「そのメールアドレスは登録されていません」と
+      出し分けると第三者が<strong>招待済みのメールアドレスを詮索できてしまう</strong>ためです
+      （ユーザー列挙対策）。
+    </p>
+
+    <h3>パスワード再設定も同じ道を通る</h3>
+    <p>
+      パスワードを忘れた場合の再設定メールも、招待と同じ implicit 形式で
+      <code>/set-password</code> に戻ってきます。そのため <code>set-password</code> ページは
+      招待専用ではなく、<strong>招待と再設定の両方の受け口</strong>として作られています。
+    </p>
+  </section>
+
+  <section class="doc-section" id="rpc">
+    <h2>車検完了だけ RPC を使っている理由</h2>
+
+    <p>
+      PostgREST の1リクエストは<strong>テーブルをまたげません</strong>。車検完了は
+      「整備記録の挿入」＋「車両の満了日更新」の2テーブル更新なので、2回に分けると
+      「記録だけ増えて満了日が古いまま」という半端な状態が起こりえます。
+    </p>
+    <p>
+      そこで Postgres 側に <code>complete_shaken</code> 関数を置き、
+      <a href="src/features/shaken/server/complete-shaken.html"><code>shaken/server/complete-shaken.ts</code></a> から
+      <code>.rpc()</code> で1トランザクションとして呼んでいます。この関数は
+      <code>security invoker</code> なので、<strong>中の SQL にも呼び出したユーザーの RLS がそのまま適用</strong>されます
+      （<code>security definer</code> だと RLS を素通りしてしまいます）。
+    </p>
+  </section>
+
+  <section class="doc-section" id="workers">
+    <h2>Cloudflare Workers 固有の制約への対応</h2>
+
+    <table class="doc-structure">
+      <thead>
+        <tr><th>制約</th><th>何が起きるか</th><th>対応</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>isolate の再利用</td>
+          <td>モジュールスコープの状態が別リクエストへ漏れる</td>
+          <td>サーバー用 Supabase クライアントを毎回作り直す</td>
+        </tr>
+        <tr>
+          <td>常に <code>TZ=UTC</code></td>
+          <td>JST の利用者から見て日付が1日ずれる</td>
+          <td><code>Date</code> に変換せず、<code>todayInJst()</code> と branded な <code>DateString</code>（<code>YYYY-MM-DD</code> 文字列）だけで計算する</td>
+        </tr>
+        <tr>
+          <td><code>process.env</code> がモジュールスコープで空</td>
+          <td>起動時に環境変数を読むと undefined になる</td>
+          <td><code>VITE_</code> 前置でビルド時にインライン化し、<a href="src/lib/supabase/env.html"><code>lib/supabase/env.ts</code></a> で Zod 検証してから使う</td>
+        </tr>
+        <tr>
+          <td>Node API が既定で使えない</td>
+          <td>Supabase SDK の一部が動かない</td>
+          <td><code>wrangler.jsonc</code> で <code>nodejs_compat</code> を有効化</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 関連: <a href="index.html">プロジェクト解説（目次）</a>
+  </footer>
+
+</div>
+</body>
+</html>
