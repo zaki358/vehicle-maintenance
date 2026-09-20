@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(ホーム画面アイコン一式をコミット `827ca7b`。本番での招待→ログインも確認済み)
+最終更新: 2026-09-20(スマホ幅のナビ／ログアウトボタン崩れを修正。CSS 2ファイル未コミット)
 
 ---
 
@@ -713,6 +713,25 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 **次にやること**: 依頼者が実データを入力して使用中。不具合の報告を待つ。
 報告が来たら再現 → `superpowers:systematic-debugging` で原因特定 → 修正。
 着手待ちの既知の課題は 404 ページのみ（下記「保留」）。
+
+**未コミットの変更あり（2026-09-20 追加分）**: スマホ幅でナビのログアウトボタンが
+2行に折り返して黒バーの高さが崩れる不具合を修正した（依頼者からスクショで報告）。
+変更は CSS 2ファイルのみで TS/TSX には触れていない。
+
+- `src/styles/buttons.css` — `.btn-utility` に `white-space: nowrap` を追加（折り返し＝高さ崩れの直接原因）。
+  480px 以下で `padding: 6px 10px` / `font-size: --text-fine-size` に詰める指定を追加
+- `src/styles/nav.css` — `.nav-brand` に `min-width: 0` / `overflow: hidden` / `text-overflow: ellipsis`、
+  `.nav-links` に `flex-shrink: 0`。480px 以下で `.nav` の gap を `--space-sm`、
+  `.nav-brand` を `--text-fine-size` に。**幅不足のしわ寄せを必ずアプリ名側（省略表示）へ流す**のが設計意図
+- **設計判断**: ハンバーガーに畳まない既存方針は維持。ナビ内で読めなくても困らないのは
+  アプリ名だけなので、そこだけを縮む要素にした
+- **ブラウザ実測で検証済み**（dev サーバー＋ナビDOMを注入して計測）:
+  375px → バー 44px / ボタン 65.6×32 の1行 / アプリ名は省略なし（約66px の余裕）、
+  320px → バー 44px 維持・ボタン1行のまま・アプリ名のみ `…` で省略、
+  481px・768px → 従来どおり（バー 44px / ボタン 82.5×32 / 省略なし）。横スクロール発生なし
+- `docs/src/styles/nav.html` と `docs/src/styles/buttons.html` も更新済み（CLAUDE.md ルール2）
+- **未実施**: `npm run test:coverage` と Playwright E2E は未実行（CSS のみの変更のため）。
+  コミットも未実施
 
 **保留（依頼者が後回しと判断）**
 - 存在しないURLを開くと TanStack Router 既定の素の `Not Found` が出る。

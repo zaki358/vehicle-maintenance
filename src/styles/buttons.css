@@ -61,6 +61,8 @@
   color: var(--body-on-dark);
   font-size: var(--text-caption-size);
   letter-spacing: var(--tracking-caption);
+  /* ラベルを折り返させない。折り返すと高さが伸びて 44px のナビが崩れる */
+  white-space: nowrap;
 }
 
 /* 黒背景のナビ上では ink が沈むため、輪郭だけの淡色にする */
@@ -92,5 +94,12 @@
 @media (max-width: 480px) {
   .btn-row > .btn {
     flex: 1 1 100%;
+  }
+
+  /* 狭い画面ではナビの文字サイズ（fine）に合わせて詰め、黒バーの一行に収める */
+  .btn-utility {
+    padding: 6px 10px;
+    font-size: var(--text-fine-size);
+    letter-spacing: var(--tracking-fine);
   }
 }

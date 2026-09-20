@@ -161,6 +161,8 @@
   color: var(--body-on-dark);
   font-size: var(--text-caption-size);
   letter-spacing: var(--tracking-caption);
+  /* ラベルを折り返させない。折り返すと高さが伸びて 44px のナビが崩れる */
+  white-space: nowrap;
 }</code></pre>
       <p>
         ピルではなく <strong>8px の角丸</strong>の小さな箱で、ログアウトのような
@@ -168,6 +170,14 @@
         44px の原則から外れていますが、これは design.md が
         「グローバルナビのユーティリティリンクは、精密なデスクトップ操作である
         ことを理由に意図的に小さい」と明記している箇所に沿ったものです。
+      </p>
+      <p>
+        <code>white-space: nowrap</code> は<strong>高さを守るための指定</strong>です。
+        これが無いと、幅の足りない画面でラベルが「ログア／ウト」と2行に折り返し、
+        ボタンの高さが 32px から伸びて、その分 <code>.nav</code> の
+        <code>min-height: 44px</code> を押し広げてしまいます
+        （黒バーだけが不自然に分厚くなる）。ボタンは<strong>幅で調整して高さは
+        固定</strong>、という原則をここで担保しています。
       </p>
     </div>
 
@@ -220,6 +230,13 @@
   .btn-row &gt; .btn {
     flex: 1 1 100%;
   }
+
+  /* 狭い画面ではナビの文字サイズ（fine）に合わせて詰め、黒バーの一行に収める */
+  .btn-utility {
+    padding: 6px 10px;
+    font-size: var(--text-fine-size);
+    letter-spacing: var(--tracking-fine);
+  }
 }</code></pre>
       <p>
         複数ボタンを横に並べる入れ物です。<code>flex-wrap: wrap</code> により
@@ -230,12 +247,25 @@
         縦積みにします。狭い画面で小さなボタンが肩を並べると押し間違いが
         起きやすいため、1行1操作にして誤タップを防ぎます。
       </p>
+      <p>
+        同じ境界で <code>.btn-utility</code> も詰めます。文字を 14px → 12px、
+        左右パディングを 15px → 10px にすることで、ボタン幅は 82.5px → 65.6px
+        になり、アプリ名を省略せずに黒バーへ収まるようになります。
+        12px は隣の <code>.nav-link</code>（ダッシュボード・車両）と同じサイズなので、
+        <strong>狭い画面ではログアウトだけが大きく浮いて見える問題</strong>も同時に
+        解消します。<code>min-height: 32px</code> は据え置きなので、
+        タップ領域の高さは変わりません。
+      </p>
+      <p>
+        このセレクタが効くのはナビのログアウトボタンだけです
+        （<code>.btn-utility</code> の使用箇所は <code>app-nav.tsx</code> の1か所のみ）。
+      </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-20 ／ 対象ファイル: src/styles/buttons.css
+    生成日: 2026-09-20（スマホ幅のユーティリティボタン調整を反映） ／ 対象ファイル: src/styles/buttons.css
   </footer>
 
 </div>

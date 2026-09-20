@@ -40,14 +40,14 @@
       </thead>
       <tbody>
         <tr><td><code>.nav</code></td><td>クラス</td><td>最上段の黒いバー。sticky で最前面</td></tr>
-        <tr><td><code>.nav-brand</code></td><td>クラス</td><td>左端のアプリ名リンク</td></tr>
-        <tr><td><code>.nav-links</code></td><td>クラス</td><td>右寄せのリンク群</td></tr>
+        <tr><td><code>.nav-brand</code></td><td>クラス</td><td>左端のアプリ名リンク。幅が足りないときに縮む唯一の要素</td></tr>
+        <tr><td><code>.nav-links</code></td><td>クラス</td><td>右寄せのリンク群。縮まない（<code>flex-shrink: 0</code>）</td></tr>
         <tr><td><code>.nav-link</code></td><td>クラス</td><td>ナビ内リンク（12px の控えめな文字）</td></tr>
         <tr><td><code>.sub-nav</code></td><td>クラス</td><td>2段目のすりガラスバー</td></tr>
         <tr><td><code>.sub-nav-title</code></td><td>クラス</td><td>左のページ名</td></tr>
         <tr><td><code>.sub-nav-actions</code></td><td>クラス</td><td>右寄せの主要アクション</td></tr>
         <tr><td><code>.sub-nav-back</code></td><td>クラス</td><td>戻る導線の小さなリンク</td></tr>
-        <tr><td><code>@media (max-width: 480px)</code></td><td>メディアクエリ</td><td>余白・字間・ページ名サイズを詰める</td></tr>
+        <tr><td><code>@media (max-width: 480px)</code></td><td>メディアクエリ</td><td>余白・字間・アプリ名／ページ名サイズを詰める</td></tr>
       </tbody>
     </table>
   </section>
@@ -88,11 +88,15 @@
 
     <div class="doc-chunk">
       <pre><code>.nav-brand {
+  /* 幅が足りないときに縮む/省略されるのはここだけ。右のリンクとボタンは固定 */
+  min-width: 0;
+  overflow: hidden;
   color: var(--body-on-dark);
   font-size: var(--text-caption-size);
   font-weight: 600;
   letter-spacing: var(--tracking-caption);
   white-space: nowrap;
+  text-overflow: ellipsis;
 }</code></pre>
       <p>
         アプリ名は <code>&lt;Link&gt;</code> なので <code>base.css</code> の
@@ -101,11 +105,27 @@
         「車両メンテナンス記録」が狭い画面で2行に折り返し、バーの高さが
         崩れるのを防ぐためです。
       </p>
+      <p>
+        <strong><code>min-width: 0</code> / <code>overflow: hidden</code> /
+        <code>text-overflow: ellipsis</code> の3点セットが、ナビ全体の
+        「誰が犠牲になるか」を決めています。</strong>フレックスアイテムの
+        <code>min-width</code> は既定で <code>auto</code>（＝中身より狭くならない）
+        なので、これを 0 にして初めてアプリ名が縮めるようになります。縮んだ結果
+        入りきらない分は <code>…</code> で省略されます。
+      </p>
+      <p>
+        なぜアプリ名を犠牲にするのか: ナビの中で<strong>読めなくても困らないのは
+        アプリ名だけ</strong>だからです。ロゴ代わりの自己紹介なので途中で切れても
+        意味が通りますが、「ダッシュボード」「車両」「ログアウト」は操作なので、
+        切れたり折り返したりすると押し間違いや高さ崩れに直結します。
+        実測では 320px 幅の端末でのみ省略が発生し、375px 以上では全文が出ます。
+      </p>
     </div>
 
     <div class="doc-chunk">
       <pre><code>.nav-links {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-lg);
   margin-left: auto;
@@ -121,6 +141,14 @@
         <code>margin-left: auto</code> でリンク群を右端へ押しやります。
         フレックスの余白を使う方法なので、ブランド名の文字数が変わっても
         自動で追従します。
+      </p>
+      <p>
+        <code>flex-shrink: 0</code> は<strong>リンク群を絶対に縮めない</strong>
+        という宣言です。既定の <code>flex-shrink: 1</code> のままだと、幅が
+        足りないときにリンク群も一緒に潰され、中のログアウトボタンのラベルが
+        「ログア／ウト」と2行に折り返して黒バーの高さが 44px から伸びてしまいます。
+        ここを固定することで、足りない幅のしわ寄せは必ず
+        <code>.nav-brand</code> 側（省略表示）へ行きます。
       </p>
       <p>
         リンクの文字は 12px（<code>--text-fine-size</code>）と、本文より
@@ -218,16 +246,31 @@
     padding-right: var(--space-md);
   }
 
+  .nav { gap: var(--space-sm); }
+
+  .nav-brand {
+    font-size: var(--text-fine-size);
+    letter-spacing: var(--tracking-fine);
+  }
+
   .nav-links { gap: var(--space-sm); }
 
   .sub-nav-title { font-size: var(--text-body-size); }
 }</code></pre>
       <p>
         ここが<strong>ハンバーガーの代わり</strong>です。左右余白を 24px → 17px、
-        リンク間隔を 24px → 12px に詰め、ページ名を 21px → 17px に縮めることで、
+        アプリ名とリンク群の間隔およびリンク間隔を 24px → 12px に詰め、
+        アプリ名を 14px → 12px、ページ名を 21px → 17px に縮めることで、
         3つのリンクを横一列のまま収めます。開閉状態を持つメニューを作らずに
         済むため、フォーカス管理・外側クリックでの閉じ処理・キーボード操作
         といった実装とテストの負担がまるごと不要になります。
+      </p>
+      <p>
+        アプリ名を 12px に落とすのは、<strong>リンクと同じ文字サイズに揃える</strong>
+        という意味もあります。狭い画面では 14px のアプリ名だけが浮いて見えるうえ、
+        実測で約 16px 分の横幅を消費していました。12px にすると 375px 幅で
+        省略なしに全文が収まります（実測: アプリ名 101.8px ／ リンク群 172.7px ／
+        余白 34px で、375px に対して約 66px の余裕）。
       </p>
       <p>
         左右余白の 17px は <code>layout.css</code> の <code>.section</code> が
@@ -239,7 +282,7 @@
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-20 ／ 対象ファイル: src/styles/nav.css
+    生成日: 2026-09-20（スマホ幅のナビ調整を反映） ／ 対象ファイル: src/styles/nav.css
   </footer>
 
 </div>

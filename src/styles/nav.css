@@ -18,15 +18,20 @@
 }
 
 .nav-brand {
+  /* 幅が足りないときに縮む/省略されるのはここだけ。右のリンクとボタンは固定 */
+  min-width: 0;
+  overflow: hidden;
   color: var(--body-on-dark);
   font-size: var(--text-caption-size);
   font-weight: 600;
   letter-spacing: var(--tracking-caption);
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .nav-links {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-lg);
   margin-left: auto;
@@ -87,6 +92,15 @@
   .sub-nav {
     padding-left: var(--space-md);
     padding-right: var(--space-md);
+  }
+
+  .nav {
+    gap: var(--space-sm);
+  }
+
+  .nav-brand {
+    font-size: var(--text-fine-size);
+    letter-spacing: var(--tracking-fine);
   }
 
   .nav-links {
