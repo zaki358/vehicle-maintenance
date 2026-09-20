@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(UI刷新 Phase A〜F。デザインシステム導入・作業区分9種への作り替え・車検の統合)
+最終更新: 2026-09-20(ホーム画面アイコン対応。apple-touch-icon / Web App Manifest / favicon を追加)
 
 ---
 
@@ -501,6 +501,48 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 - 本番Supabase（`wwvuxjvcwntqzdvyezss`）へのマイグレーション2本の適用と、本番へのデプロイ
 - 本番の Site URL は `https://vehicle-maintenance.y-kakeibo.workers.dev/set-password` に変更済み
 
+### 2026-09-20（ホーム画面アイコン対応）
+
+依頼者から「iPhoneでホーム画面に登録すると頭文字1文字の味気ないアイコンになる。
+`image/icon.jpg` を使いたい」との依頼。
+
+- [x] **`tools/generate-icons.py` を新設**し、`image/icon.jpg` から `public/` のアイコン9点を生成
+      - **元画像の落とし穴**: 一見透過しているが、実際は「透過を表す市松模様」が
+        描き込まれた JPEG でアルファチャンネルは無い。青い角丸スクエアの位置を
+        画素走査で実測（`RECT = (255, 256, 769, 769)`、角丸半径 104）して切り出す必要がある
+      - **角丸のまま切ると四隅に市松模様が残る**ため塗り足しが要る。2次曲面で背景の
+        グラデーションを近似して埋める方法を試したが、**境界に約10階調の段差**が出た。
+        最終的に**角丸に内接する正方形**（`INSET = 40`）を切り出す方式にした。
+        全画素が元画像そのままなので継ぎ目が原理的に出ない。ロゴ周囲の余白は十分あり絵柄は欠けない
+      - **アイコンの角は丸めない**。iOS / Android が自前で角丸マスクをかけるため、
+        こちらで丸めると二重に丸まって縁に隙間が出る
+      - maskable 版は中央 78% にロゴを収め、外周は `np.pad(mode="edge")` で端の画素を
+        複製して埋めた（新しい色を作らないので継ぎ目が出ない）
+- [x] **`public/` を新設**（このプロジェクト初の静的アセットディレクトリ）
+      `apple-touch-icon.png`(180) / `icon-{192,512}.png` / `icon-maskable-{192,512}.png` /
+      `favicon-{16,32}.png` / `favicon.ico`(16,32,48) / `manifest.webmanifest`
+- [x] **`src/routes/__root.tsx` に `link` / `meta` を追加**
+      - **iOS は manifest の `icons` を読まない**。`rel="apple-touch-icon"` だけを見るので、
+        manifest だけ用意しても iPhone では効かない。ここが今回の要点
+      - `theme-color: #000000`（上部ナビの黒 `--surface-black` に合わせた）
+      - `apple-mobile-web-app-title: CAR DOC`（`<title>`の「車両メンテナンス記録」は
+        ホーム画面ラベルとしては長すぎて省略される）
+- [x] `docs/src/routes/__root.html` を生成、`docs/index.html` の目次とフォルダ構成表を更新
+- [x] 検証: `npm run typecheck` 通過 / dev サーバー(3101)で9アセット全て 200・
+      Content-Type 正常・head出力正常・コンソールエラー無し
+- [x] **本番デプロイ済み**（`npm run build` → `npx wrangler deploy`、Version ID
+      `55110218-c9fc-4140-82f1-4fbfb591614d`）。本番URLで9アセット全て 200 を確認、
+      `apple-touch-icon` が 180x180 でデコードできることも確認
+      - 配信の仕組み: `dist/server/wrangler.json` の `"assets": {"directory": "../client"}`。
+        Vite が `public/` を `dist/client` へコピーするので、`public/` に置けばそのまま配信される
+
+**意図的にやらなかったこと**
+- **`apple-mobile-web-app-capable` は入れていない**。iOS のスタンドアロンモードは
+  Safari と別ストレージになるため、招待/パスワード再設定メールのリンク（Safari で開く）で
+  確立したセッションがホーム画面アプリ側に引き継がれない。依頼者が
+  「ブラウザで操作する」と言っている現状の挙動を変えない方を選んだ。
+  manifest の `display: "standalone"` は Android 側のみに効く（iOS は無視する）
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -667,8 +709,12 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 **中断時点**: 全フェーズ（0〜9）完了・本番デプロイ済み
 （https://vehicle-maintenance.y-kakeibo.workers.dev ）。
 開発環境では招待→パスワード設定→ログインまで実機で成功済み。
-未コミットの変更: `/set-password`修正一式（上記2026-09-20の節）と`docs/index.html`。
+未コミットの変更: `/set-password`修正一式（上記2026-09-20の節）と`docs/index.html`、
+およびホーム画面アイコン一式（`public/` `tools/` `image/` `src/routes/__root.tsx`）。
 コミットするかどうか依頼者に確認すること。
+
+**ホーム画面アイコンは本番へデプロイ済み**。iPhone 側で既にホーム画面に追加済みの場合、
+**一度削除して追加し直さないと古いアイコンがキャッシュされたまま**になる点に注意。
 
 ---
 

@@ -183,6 +183,9 @@
         <tr><td><code>src/lib/supabase/</code></td><td>環境変数検証（<code>env.ts</code>）と自動生成の DB 型（<code>database.types.ts</code>）</td></tr>
         <tr><td><code>src/integrations/supabase/</code></td><td>Supabase SDK を実際に配線する層（ブラウザ/サーバー クライアント生成）。<code>lib/</code> の import 禁止ルールと矛盾しないよう分離</td></tr>
         <tr><td><code>src/test/</code></td><td>Vitest のグローバルセットアップ（<code>@testing-library/jest-dom</code> 等）</td></tr>
+        <tr><td><code>public/</code></td><td>そのまま配信される静的ファイル。ホーム画面アイコン一式（<code>apple-touch-icon.png</code> / <code>icon-*.png</code> / <code>favicon.*</code>）と <code>manifest.webmanifest</code></td></tr>
+        <tr><td><code>image/</code></td><td>アイコンの元絵（<code>icon.jpg</code>）。配信されないので、差し替えたら <code>tools/generate-icons.py</code> で <code>public/</code> を作り直す</td></tr>
+        <tr><td><code>tools/</code></td><td>開発時の補助スクリプト（<code>generate-icons.py</code>：元絵から各サイズのアイコンを生成）</td></tr>
         <tr><td><code>scripts/</code></td><td>依頼者がローカルで実行する運用スクリプト（<code>invite-user.ts</code>）。Claude は実行しない</td></tr>
         <tr><td><code>supabase/migrations/</code></td><td>DB マイグレーション SQL（5本）。テーブル定義・RLS ポリシー・<code>complete_shaken</code> 関数</td></tr>
         <tr><td><code>supabase/tests/</code></td><td>RLS を守る統合テスト（開発用 Supabase プロジェクトに対して実行。<code>npm run test:rls</code>）</td></tr>
@@ -215,6 +218,7 @@
 
     <h3 id="routes">ルート / ページ（src/routes）</h3>
     <div class="index-grid">
+      <a class="index-card" href="src/routes/__root.html"><div class="index-card-title">__root.tsx</div><div class="index-card-path">HTML の骨格・head・ホーム画面アイコン</div></a>
       <a class="index-card" href="src/routes/_authed.html"><div class="index-card-title">_authed.tsx</div><div class="index-card-path">共通レイアウト・認証ガード</div></a>
       <a class="index-card" href="src/routes/_authed.index.html"><div class="index-card-title">_authed.index.tsx</div><div class="index-card-path">ダッシュボード（トップページ）</div></a>
       <a class="index-card" href="src/routes/login.html"><div class="index-card-title">login.tsx</div><div class="index-card-path">ログインページ</div></a>

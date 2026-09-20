@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__root.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>__root.tsx</h1>
+    <div class="doc-path">src/routes/__root.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      すべてのルートの一番外側にある「土台」です。TanStack Router のファイルベース
+      ルーティングでは <code>__root.tsx</code> が特別扱いされ、ここで定義した
+      <code>&lt;html&gt;</code> ／ <code>&lt;head&gt;</code> ／ <code>&lt;body&gt;</code>
+      の中に、他のすべてのページが描画されます。
+    </p>
+    <p>
+      役割は大きく2つです。1つは <code>head()</code> で
+      <code>&lt;head&gt;</code> の中身（文字コード・viewport・タイトル・アイコン・manifest）を
+      宣言すること。もう1つは <code>shellComponent</code> で HTML ドキュメントの
+      骨格そのものを組み立てることです。
+    </p>
+    <p>
+      <strong>ホーム画面アイコンの設定はこのファイルが入口になります。</strong>
+      iPhone や Android でこのアプリを「ホーム画面に追加」したとき、
+      何も指定しないとページのスクリーンショットや頭文字1文字の
+      味気ないアイコンになってしまいます。それを避けるため、
+      <code>apple-touch-icon</code> と Web App Manifest をここから配線しています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Route</code></td><td>const（export）</td><td>ルートルートの定義。<code>head()</code> と <code>shellComponent</code> を持つ</td></tr>
+        <tr><td><code>Route.head()</code></td><td>function</td><td><code>&lt;head&gt;</code> に出力する <code>meta</code> / <code>link</code> を返す</td></tr>
+        <tr><td><code>RootDocument</code></td><td>function（component）</td><td>HTML ドキュメントの骨格（<code>html</code> / <code>head</code> / <code>body</code>）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>関連するファイル</h3>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>パス</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>public/manifest.webmanifest</code></td><td>Web App Manifest。アプリ名・テーマ色・アイコン一覧を宣言する</td></tr>
+        <tr><td><code>public/apple-touch-icon.png</code></td><td>180&times;180。iOS のホーム画面アイコン</td></tr>
+        <tr><td><code>public/icon-192.png</code> / <code>icon-512.png</code></td><td>manifest から参照される通常アイコン</td></tr>
+        <tr><td><code>public/icon-maskable-192.png</code> / <code>icon-maskable-512.png</code></td><td>Android の maskable 用。中央 78% にロゴを収めてある</td></tr>
+        <tr><td><code>public/favicon.ico</code> / <code>favicon-32.png</code> / <code>favicon-16.png</code></td><td>ブラウザのタブに出るアイコン</td></tr>
+        <tr><td><code>tools/generate-icons.py</code></td><td>上記の画像一式を <code>image/icon.jpg</code> から生成するスクリプト</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+
+import appCss from '../styles.css?url'
+
+export const Route = createRootRoute({
+  head: () =&gt; ({
+    meta: [ /* ... */ ],
+    links: [ /* ... */ ],
+  }),
+  shellComponent: RootDocument,
+})</code></pre>
+      <p>
+        <code>createRootRoute</code> はルートツリーの頂点を作ります。
+        <code>head()</code> が返した <code>meta</code> / <code>links</code> は、
+        後述の <code>&lt;HeadContent /&gt;</code> の位置に実際のタグとして描画されます。
+        子ルート側でも <code>head()</code> を書くとここの内容にマージされるため、
+        ここには「全ページ共通のもの」だけを置きます。
+      </p>
+      <p>
+        <code>appCss</code> の <code>?url</code> は Vite の機能で、CSS を
+        JS にバンドルせずファイルの URL 文字列として取り込むための指定です。
+        こうすることで <code>&lt;link rel="stylesheet"&gt;</code> として読み込ませ、
+        初回描画時にスタイルが当たっていない状態（FOUC）を避けられます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>{
+  // ブラウザの上枠・Android のステータスバーの色。上部ナビの黒に合わせる
+  name: 'theme-color',
+  content: '#000000',
+},
+{
+  // iOS のホーム画面でアイコンの下に出る名前。長いと省略されるので短くする
+  name: 'apple-mobile-web-app-title',
+  content: 'CAR DOC',
+},
+{
+  name: 'application-name',
+  content: 'CAR DOC',
+},</code></pre>
+      <p>
+        <code>theme-color</code> は、Android の Chrome ではアドレスバーやステータスバー、
+        iOS の Safari では上下のツールバーの地色に使われます。
+        <code>#000000</code> にしているのは、アプリ上部のナビゲーション
+        （<code>src/styles/nav.css</code> の <code>.nav</code>、<code>--surface-black</code>）が
+        真っ黒なバーだからです。同じ色にしておくと、ブラウザのUIとアプリのナビが
+        1枚の黒い帯として繋がって見えます。
+      </p>
+      <p>
+        <code>apple-mobile-web-app-title</code> は iOS のホーム画面でアイコンの下に
+        表示されるラベルです。これを書かないと <code>&lt;title&gt;</code> の
+        「車両メンテナンス記録」がそのまま使われますが、ホーム画面のラベルは
+        十数文字で省略されてしまいます。アイコンの絵柄（CAR DOC）と揃えた
+        短い名前にしています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>// iOS はここだけを見る。manifest の icons は参照しない
+{
+  rel: 'apple-touch-icon',
+  sizes: '180x180',
+  href: '/apple-touch-icon.png',
+},</code></pre>
+      <p>
+        <strong>ここがホーム画面アイコン対応の要です。</strong>
+        iOS の Safari は Web App Manifest の <code>icons</code> を読みません。
+        ホーム画面に追加するときに見るのは <code>rel="apple-touch-icon"</code> だけで、
+        これが無い場合はページのスクリーンショットを縮小したものが使われます。
+        つまり manifest だけ用意しても iPhone では効きません。
+      </p>
+      <p>
+        画像は <strong>角を丸めずに全面を塗った正方形</strong>にしてあります。
+        iOS はアイコンに自前で角丸（スクイーカル）マスクをかけるため、
+        こちら側で角を丸めると二重に丸まって縁に隙間が出るためです。
+        180&times;180 なのは、iPhone の標準的なホーム画面アイコンの解像度に
+        合わせたものです（OS 側が必要なサイズへ縮小してくれます）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>{
+  rel: 'icon',
+  type: 'image/png',
+  sizes: '32x32',
+  href: '/favicon-32.png',
+},
+{
+  rel: 'icon',
+  type: 'image/png',
+  sizes: '16x16',
+  href: '/favicon-16.png',
+},
+{
+  rel: 'icon',
+  href: '/favicon.ico',
+  sizes: '48x48',
+},
+{
+  rel: 'manifest',
+  href: '/manifest.webmanifest',
+},</code></pre>
+      <p>
+        PNG の favicon を 2 サイズ並べているのは、ブラウザが表示環境
+        （通常のタブ／高解像度ディスプレイ／ブックマークバー）に応じて
+        一番近いサイズを選べるようにするためです。
+        <code>favicon.ico</code> も残してあるのは、<code>&lt;link&gt;</code> を
+        一切見ずに <code>/favicon.ico</code> を直接取りに行く古いブラウザや
+        クローラーがあるためのフォールバックです。
+      </p>
+      <p>
+        <code>rel="manifest"</code> が Web App Manifest への入口です。
+        Android の Chrome はこれを読んで、ホーム画面アイコン・アプリ名・
+        起動時の背景色を決めます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    &lt;html lang="ja"&gt;
+      &lt;head&gt;
+        &lt;HeadContent /&gt;
+      &lt;/head&gt;
+      &lt;body&gt;
+        {children}
+
+        &lt;Scripts /&gt;
+      &lt;/body&gt;
+    &lt;/html&gt;
+  )
+}</code></pre>
+      <p>
+        <code>shellComponent</code> として登録されるコンポーネントで、
+        HTML ドキュメントそのものを返します。通常の React アプリのように
+        <code>index.html</code> が別にあるのではなく、TanStack Start では
+        この関数がサーバーサイドレンダリングの出力全体になります。
+      </p>
+      <p>
+        <code>&lt;HeadContent /&gt;</code> は、ルートと子ルートの
+        <code>head()</code> が返した内容をここに差し込むプレースホルダです。
+        <code>&lt;Scripts /&gt;</code> はクライアント側の JS バンドルの
+        <code>&lt;script&gt;</code> タグを出力します。<code>{children}</code> の
+        後ろに置くのは、本文の描画をスクリプトの読み込みでブロックしないためです。
+      </p>
+      <p>
+        <code>lang="ja"</code> はスクリーンリーダーの読み上げ言語や
+        ブラウザの翻訳提案の判断に使われます。
+      </p>
+    </div>
+
+  </section>
+
+  <section class="doc-section">
+    <h2>public/manifest.webmanifest</h2>
+    <p>
+      <code>rel="manifest"</code> から参照される設定ファイルです。
+      主に Android の Chrome が読みます（iOS は前述のとおり参照しません）。
+    </p>
+
+    <div class="doc-chunk">
+      <pre><code>{
+  "name": "車両メンテナンス記録",
+  "short_name": "CAR DOC",
+  "description": "車とバイクの整備記録・車検管理",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f7",
+  "theme_color": "#000000",
+  "icons": [ /* ... */ ]
+}</code></pre>
+      <p>
+        <code>name</code> はインストール確認ダイアログなどに出る正式名称、
+        <code>short_name</code> はホーム画面のアイコン下に出る短い名前です。
+        iOS 側の <code>apple-mobile-web-app-title</code> と同じ
+        「CAR DOC」に揃えています。
+      </p>
+      <p>
+        <code>background_color</code> の <code>#f5f5f7</code> は
+        <code>src/styles/tokens.css</code> の <code>--canvas-parchment</code>、
+        つまりアプリ本体の地の色と同じ値です。起動直後にコンテンツが
+        描画されるまでの一瞬この色で塗られるため、揃えておくと
+        白い画面がちらつきません。
+      </p>
+      <p>
+        <code>display: "standalone"</code> は Android でインストールしたときに
+        ブラウザのUIを隠してネイティブアプリのように起動する設定です。
+        iOS では <code>display</code> は無視され、代わりに
+        <code>apple-mobile-web-app-capable</code> という meta タグが同じ役割を持ちますが、
+        <strong>あえて入れていません</strong>。iOS のスタンドアロンモードは
+        Safari と別のストレージ領域を使うため、招待メール・パスワード再設定メールの
+        リンク（Safari で開く）で設定したセッションがホーム画面アプリ側に
+        引き継がれない、という問題を避けるためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>"icons": [
+  { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+  { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+]</code></pre>
+      <p>
+        <code>purpose</code> が <code>"any"</code> と <code>"maskable"</code> の
+        2種類あるのは、Android がアイコンを加工する方法が2通りあるためです。
+        <code>any</code> はそのまま表示される想定、<code>maskable</code> は
+        端末ごとに違う形（丸・角丸・雫型など）に切り抜かれる想定です。
+      </p>
+      <p>
+        切り抜きで保証されるのは中央 80% の範囲だけなので、
+        maskable 版はロゴを中央 78%（<code>SAFE_ZONE</code>）に縮めて配置し、
+        周囲を余白で埋めてあります。これを用意しないと、Android が
+        <code>any</code> のアイコンを勝手に縮小して白い枠を付けた
+        「白縁のシール」のような見た目になってしまいます。
+      </p>
+    </div>
+  </section>
+
+  <section class="doc-section">
+    <h2>tools/generate-icons.py</h2>
+    <p>
+      <code>image/icon.jpg</code> から <code>public/</code> のアイコン一式を
+      作り直すスクリプトです。元絵を差し替えたときに
+      <code>python tools/generate-icons.py</code> を実行すれば全サイズが揃います。
+    </p>
+
+    <div class="doc-chunk">
+      <pre><code># 青い角丸スクエアの位置（元画像 1024x1024 を走査して実測）
+RECT = (255, 256, 769, 769)
+# 内接正方形の余白。角丸半径 104 に対する幾何的な下限は 31 だが、
+# 縁に沿う明るいリムと JPEG のにじみを避けるため 40 まで寄せる
+INSET = 40</code></pre>
+      <p>
+        元画像には注意点があります。一見すると背景が透過しているように見えますが、
+        実際は<strong>「透過を表す市松模様」がそのまま描き込まれた JPEG</strong> で、
+        アルファチャンネルはありません。そのため、青い角丸スクエアの領域を
+        座標で切り出す必要があります。<code>RECT</code> はその位置を
+        画素走査で実測した値です。
+      </p>
+      <p>
+        切り出すのは角丸スクエアそのものではなく、<strong>それに内接する正方形</strong>です。
+        角丸のまま切ると四隅に市松模様が残るので塗り足しが必要になりますが、
+        グラデーションを人工的に延長すると継ぎ目が目立ちます
+        （実際に2次曲面で近似を試みたところ、境界に約10階調の段差が出ました）。
+        内接部分だけを使えば全画素が元画像そのままなので、継ぎ目が原理的に発生しません。
+        ロゴの周囲には十分な余白があるため、切り落としても絵柄は欠けません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>def with_safe_zone(master: Image.Image) -&gt; Image.Image:
+    size = master.size[0]
+    pad = round(size * (1 / SAFE_ZONE - 1) / 2)
+    padded = np.pad(np.asarray(master), ((pad, pad), (pad, pad), (0, 0)), mode="edge")
+    return Image.fromarray(padded).resize((size, size), Image.LANCZOS)</code></pre>
+      <p>
+        maskable 用の余白を作る処理です。<code>np.pad</code> の
+        <code>mode="edge"</code> は端の画素をそのまま外側へ複製します。
+        新しく色を作らず既存の端の色を引き伸ばすだけなので、
+        こちらも継ぎ目が出ません。背景が縦方向のなだらかなグラデーションなので、
+        端の複製でも不自然に見えない、という前提に乗っています。
+      </p>
+    </div>
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/routes/__root.tsx（付随: public/manifest.webmanifest, tools/generate-icons.py）
+  </footer>
+
+</div>
+</body>
+</html>
