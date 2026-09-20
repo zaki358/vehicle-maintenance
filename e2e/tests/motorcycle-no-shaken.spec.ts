@@ -43,7 +43,7 @@ test.describe('250ccバイク(車検対象外)', () => {
 
   test('詳細ページに車検UIが一切出ない', async ({ page }) => {
     await page.getByRole('link', { name: vehicleName }).click()
-    await expect(page.getByText('車検満了日: 車検対象外')).toBeVisible()
+    await expect(page.getByText('車検対象外')).toBeVisible()
     await expect(page.getByRole('link', { name: '車検完了を記録' })).toHaveCount(0)
     await expect(page.getByRole('alert')).toHaveCount(0)
     await expect(page.getByRole('status')).toHaveCount(0)

@@ -17,15 +17,19 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      整備記録を更新するサーバー関数です。整備記録の編集ページ
-      （<code>_authed.vehicles.$vehicleId.records.$recordId.edit.tsx</code>）から、
-      「どの記録を（<code>id</code>）」「どんな内容に（<code>recordSchema</code> で
-      検証済みの入力）」更新するかを受け取ります。
+      既存の整備記録を更新するサーバー関数です。<code>create.ts</code> と対になる
+      構造を持ち、入口で <code>recordSchema</code> による検証を行ってから
+      <code>maintenance_records</code> を <code>update</code> します。
     </p>
     <p>
-      <code>create.ts</code> と同じ理由で <code>record</code> フィールドにネストさせて
-      スキーマを合成しています。<code>vehicle_id</code> は更新対象に含めていません。
-      記録を別の車両へ付け替える操作はこのアプリの仕様に存在しないためです。
+      作業内容の区分の入れ替えにより、更新する列が <code>detail</code>・
+      <code>oil_type</code>・<code>element_changed</code> を含む新しい構成に
+      変わりました（廃止された <code>work_type_other</code> はありません）。
+    </p>
+    <p>
+      更新系ならではの判断として、<strong>存在しない記録と他人の記録を区別せず
+      <code>null</code> を返す</strong>点、そして <strong><code>vehicle_id</code> を
+      更新対象に含めない</strong>点があります。
     </p>
   </section>
 
@@ -36,11 +40,11 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>updateRecordSchema</code></td><td>const</td><td><code>recordIdSchema</code> と <code>recordSchema</code> を合成した入力スキーマ</td></tr>
-        <tr><td><code>UpdateRecordInput</code></td><td>type（export）</td><td><code>updateRecordSchema</code> から推論した入力の型</td></tr>
-        <tr><td><code>UpdateRecordDeps</code></td><td>interface</td><td>ハンドラが必要とする Supabase クライアントの最小インターフェース</td></tr>
-        <tr><td><code>updateRecordHandler</code></td><td>async function（export）</td><td>整備記録を更新し、更新後の行（または <code>null</code>）を返す純粋なハンドラ</td></tr>
-        <tr><td><code>updateRecordFn</code></td><td>const（export）</td><td><code>createServerFn</code> でラップした実HTTPエンドポイント</td></tr>
+        <tr><td><code>updateRecordSchema</code></td><td>Zod スキーマ（非export）</td><td>記録ID + 記録本体の入力定義</td></tr>
+        <tr><td><code>UpdateRecordInput</code></td><td>type（export）</td><td><code>z.infer</code> による入力型</td></tr>
+        <tr><td><code>UpdateRecordDeps</code></td><td>interface（非export）</td><td>ハンドラに注入する依存（Supabase クライアント）</td></tr>
+        <tr><td><code>updateRecordHandler</code></td><td>function（export）</td><td>実際に <code>update</code> する本体。テスト対象</td></tr>
+        <tr><td><code>updateRecordFn</code></td><td>server function（export）</td><td>HTTP エンドポイント。検証 → ハンドラ呼び出し</td></tr>
       </tbody>
     </table>
   </section>
@@ -49,11 +53,31 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>const updateRecordSchema = recordIdSchema.extend({ record: recordSchema })</code></pre>
+      <pre><code>const updateRecordSchema = recordIdSchema.extend({ record: recordSchema })
+
+export type UpdateRecordInput = z.infer&lt;typeof updateRecordSchema&gt;</code></pre>
       <p>
-        <code>create.ts</code> の <code>createRecordSchema</code> と対称的な構成です。
-        こちらは「どの記録を」を表す <code>recordIdSchema</code>（<code>{ id }</code>）に、
-        「どんな内容に」を表す <code>record</code> フィールドを足しています。
+        更新対象の <code>id</code>（<code>recordIdSchema</code>）と記録の中身を
+        合成します。<code>create.ts</code> と同じく <code>record</code> という
+        フィールドにネストさせるのは、<code>recordSchema</code> が
+        <code>superRefine</code> / <code>transform</code> を挟んだ ZodEffects で
+        <code>.shape</code> を持たず、平坦な <code>extend</code> ができないためです。
+      </p>
+      <p>
+        この合成により、区分ごとの必須チェックと「使わない値を空へ戻す」正規化が
+        更新時にもそのまま働きます。編集画面で区分を切り替えて保存しても、
+        前の区分の値が残ったまま DB に書き込まれることはありません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>interface UpdateRecordDeps {
+  supabase: Pick&lt;SupabaseClient&lt;Database&gt;, 'from'&gt;
+}</code></pre>
+      <p>
+        <code>create.ts</code> と同じく、使う機能だけを <code>Pick</code> で
+        切り出した依存型です。テストでは <code>from</code> だけを持つモックを
+        渡して <code>updateRecordHandler</code> を直接呼べます。
       </p>
     </div>
 
@@ -67,40 +91,81 @@
     .update({
       performed_on: input.record.performedOn,
       work_type: input.record.workType,
-      work_type_other: input.record.workTypeOther,
+      detail: input.record.detail,
       odometer_km: input.record.odometerKm,
       part_detail: input.record.partDetail,
+      oil_type: input.record.oilType,
+      element_changed: input.record.elementChanged,
       note: input.record.note,
     })
     .eq('id', input.id)
     .select()
-    .maybeSingle()
-  if (error) {
+    .maybeSingle()</code></pre>
+      <p>
+        <strong><code>vehicle_id</code> が更新対象に入っていない</strong>のが意図的です。
+        記録を別の車両へ付け替える操作はこのアプリでは提供しません。列を
+        更新対象から外すことで、その操作を「できない」形で表現しています。
+        <code>user_id</code> も同様に触りません（DB 側が
+        <code>auth.uid()</code> で管理する列のため）。
+      </p>
+      <p>
+        <code>.eq('id', input.id)</code> で対象を絞りますが、<strong>所有者の条件を
+        書いていない</strong>点に注意してください。他人の記録を弾くのは RLS の
+        UPDATE ポリシー（<code>USING</code> と <code>WITH CHECK</code> の両方）の
+        役目で、アプリ側の条件に頼らない設計です。
+      </p>
+      <p>
+        <code>single()</code> ではなく <code>maybeSingle()</code> を使っているため、
+        0件でもエラーにならず <code>data</code> が <code>null</code> になります。
+        これが次の説明につながります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  if (error) {
     throw new Error(error.message)
   }
   return data
 }</code></pre>
       <p>
-        <code>.maybeSingle()</code> を使い、存在しない記録・他人の記録（RLSがブロック）を
-        区別せず <code>null</code> を返します。<code>vehicles/server/update.ts</code> と同じ理由で、
-        「この ID は他人が使っている」という情報を漏らさないためです。
+        <strong>存在しない記録と、他人の記録（RLS がブロック）を区別しません。</strong>
+        どちらの場合も <code>maybeSingle()</code> が <code>null</code> を返し、
+        呼び出し側からは同じ「見つからなかった」に見えます。
+      </p>
+      <p>
+        これはセキュリティ上の判断です。区別してしまうと、他人の ID を
+        総当たりで送ることで「その ID の記録が存在するか」を調べられてしまいます
+        （<code>vehicles/server/update.ts</code> と同じ方針）。
       </p>
     </div>
 
     <div class="doc-chunk">
       <pre><code>export const updateRecordFn = createServerFn({ method: 'POST' })
   .validator(updateRecordSchema)
-  .handler(({ data }) => updateRecordHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
+  .handler(({ data }) =&gt; updateRecordHandler(data, { supabase: createSupabaseServerClient() }))</code></pre>
       <p>
-        呼び出し側は <code>updateRecordFn({ data: { id: record.id, record: input } })</code>
-        という形で呼びます。
+        <code>.validator()</code> により、ハンドラに入る前に必ず検証が走ります。
+        サーバー関数は実 HTTP エンドポイントなので、画面を経由しない直接
+        リクエストもここで同じ検証を受けます。
+      </p>
+      <p>
+        <code>createSupabaseServerClient()</code> をハンドラ内で毎回生成するのも
+        <code>create.ts</code> と同じです。モジュールスコープでメモ化すると
+        Cloudflare Workers の isolate 再利用で他人のセッションを掴む恐れがあります。
+      </p>
+      <p>
+        <strong>車検の記録を編集してもこの関数で処理されます。</strong>
+        編集画面は <code>RecordForm</code> に <code>shakenRenewal</code> を渡さないため、
+        作業内容が「車検」のままでも <code>complete_shaken</code> RPC には回らず、
+        車両の満了日は再更新されません。過去の記録を直しただけで現在の満了日が
+        巻き戻る、という事故を防ぐための設計です。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/features/maintenance/server/update.ts
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/maintenance/server/update.ts
   </footer>
 
 </div>

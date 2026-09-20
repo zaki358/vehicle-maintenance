@@ -1,7 +1,6 @@
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { Link, createFileRoute } from '@tanstack/react-router'
 
-import { logoutFn } from '@/features/auth/server/logout'
+import { PageHeader } from '@/components/page-header'
 import { listVehiclesFn } from '@/features/vehicles/server/list'
 import type { VehicleRow } from '@/features/vehicles/server/list'
 import { vehicleTypeLabel } from '@/features/vehicles/lib/vehicle-type'
@@ -43,24 +42,8 @@ function toSummaryVehicle(row: VehicleRow): SummaryVehicle {
 }
 
 function Dashboard() {
-  const navigate = useNavigate()
   const { user } = Route.useRouteContext()
   const { vehicles, records } = Route.useLoaderData()
-  const [loggingOut, setLoggingOut] = useState(false)
-  const [logoutError, setLogoutError] = useState<string | null>(null)
-
-  async function handleLogout() {
-    setLoggingOut(true)
-    setLogoutError(null)
-    try {
-      await logoutFn()
-      await navigate({ to: '/login', replace: true })
-    } catch {
-      setLogoutError('ログアウトに失敗しました。時間をおいて再度お試しください。')
-    } finally {
-      setLoggingOut(false)
-    }
-  }
 
   const today = todayInJst()
   const summaryVehicles = vehicles.map(toSummaryVehicle)
@@ -83,50 +66,89 @@ function Dashboard() {
   }
 
   return (
-    <main>
-      <h1>車両メンテナンス記録</h1>
-      <p>ログイン中: {user.email ?? user.id}</p>
-      <button type="button" onClick={handleLogout} disabled={loggingOut}>
-        ログアウト
-      </button>
-      {logoutError && <p role="alert">{logoutError}</p>}
+    <>
+      <PageHeader
+        title="ダッシュボード"
+        actions={
+          <Link to="/vehicles/new" className="btn btn-primary">
+            車両を登録
+          </Link>
+        }
+      />
+      <main className="section section-compact">
+        <div className="container">
+          <div className="section-head">
+            <h2>登録車両</h2>
+            <p className="section-head-note">ログイン中: {user.email ?? user.id}</p>
+          </div>
 
-      <p>
-        <Link to="/vehicles/new">＋ 車両を登録</Link>
-      </p>
-
-      {summaries.length === 0 ? (
-        <p>車両がまだ登録されていません。</p>
-      ) : (
-        <ul>
-          {summaries.map((summary) => {
-            const alertMessage = shakenAlertFor(summary)
-            return (
-              <li key={summary.vehicleId}>
-                <Link to="/vehicles/$vehicleId" params={{ vehicleId: summary.vehicleId }}>
-                  {summary.name}
-                </Link>
-                ・{vehicleTypeLabel(summary.vehicleType)}
-                {summary.currentOdometerKm != null && `・${summary.currentOdometerKm}km`}
-                {summary.lastService &&
-                  `・前回整備: ${formatJa(summary.lastService.lastPerformedOn)}（${summary.lastService.daysSince}日前）`}
-                {alertMessage && (
-                  <p role={summary.shakenTier === 'warning' ? 'status' : 'alert'}>
-                    {alertMessage}{' '}
-                    <Link to="/vehicles/$vehicleId/shaken" params={{ vehicleId: summary.vehicleId }}>
-                      車検完了を記録
-                    </Link>
-                  </p>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-
-      <p>
-        <Link to="/vehicles">車両一覧へ</Link>
-      </p>
-    </main>
+          {summaries.length === 0 ? (
+            <div className="empty-state">
+              <p>車両がまだ登録されていません。</p>
+              <Link to="/vehicles/new" className="btn btn-primary">
+                最初の車両を登録
+              </Link>
+            </div>
+          ) : (
+            <ul className="card-grid">
+              {summaries.map((summary) => {
+                const alertMessage = shakenAlertFor(summary)
+                const isDanger = summary.shakenTier !== 'warning'
+                return (
+                  <li key={summary.vehicleId} className="card">
+                    <h2 className="card-title">
+                      <Link to="/vehicles/$vehicleId" params={{ vehicleId: summary.vehicleId }}>
+                        {summary.name}
+                      </Link>
+                    </h2>
+                    <div className="card-meta">
+                      <span>{vehicleTypeLabel(summary.vehicleType)}</span>
+                      {summary.currentOdometerKm != null && (
+                        <span>
+                          <span className="card-meta-label">走行距離 </span>
+                          {summary.currentOdometerKm.toLocaleString()}km
+                        </span>
+                      )}
+                      {summary.lastService && (
+                        <span>
+                          <span className="card-meta-label">前回整備 </span>
+                          {formatJa(summary.lastService.lastPerformedOn)}
+                          {/* 先の日付で記録された整備は「-5日前」になってしまうので日数を出さない */}
+                          {summary.lastService.daysSince >= 0 && `（${summary.lastService.daysSince}日前）`}
+                        </span>
+                      )}
+                    </div>
+                    {alertMessage && (
+                      <p
+                        role={summary.shakenTier === 'warning' ? 'status' : 'alert'}
+                        className={`card-alert ${isDanger ? 'card-alert-danger' : 'card-alert-warning'}`}
+                      >
+                        {alertMessage}{' '}
+                        <Link
+                          to="/vehicles/$vehicleId/records/new"
+                          params={{ vehicleId: summary.vehicleId }}
+                          search={{ workType: 'shaken' }}
+                        >
+                          車検完了を記録
+                        </Link>
+                      </p>
+                    )}
+                    <div className="card-actions">
+                      <Link
+                        to="/vehicles/$vehicleId/records/new"
+                        params={{ vehicleId: summary.vehicleId }}
+                        className="btn btn-secondary"
+                      >
+                        整備を記録
+                      </Link>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      </main>
+    </>
   )
 }

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nav.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>nav.css</h1>
+    <div class="doc-path">src/styles/nav.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      画面上部に貼り付く<strong>2段のナビゲーション</strong>のスタイルです
+      （design.md の Top Navigation）。1段目は高さ 44px の真っ黒なグローバルナビ
+      （<code>AppNav</code> コンポーネント）、2段目はすりガラス調のサブナビ
+      （<code>PageHeader</code> コンポーネント）で、ページ名とそのページの
+      主要アクションを載せます。
+    </p>
+    <p>
+      design.md の元仕様では 834px 以下でハンバーガーメニューに畳むことに
+      なっていますが、このアプリのナビは<strong>リンクが3つだけ</strong>
+      （ダッシュボード・車両・ログアウト）です。開閉状態というバグの温床を
+      増やしてまで隠す量ではないため、畳まずに文字間と左右余白を詰めて
+      収める方針にしています。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>.nav</code></td><td>クラス</td><td>最上段の黒いバー。sticky で最前面</td></tr>
+        <tr><td><code>.nav-brand</code></td><td>クラス</td><td>左端のアプリ名リンク</td></tr>
+        <tr><td><code>.nav-links</code></td><td>クラス</td><td>右寄せのリンク群</td></tr>
+        <tr><td><code>.nav-link</code></td><td>クラス</td><td>ナビ内リンク（12px の控えめな文字）</td></tr>
+        <tr><td><code>.sub-nav</code></td><td>クラス</td><td>2段目のすりガラスバー</td></tr>
+        <tr><td><code>.sub-nav-title</code></td><td>クラス</td><td>左のページ名</td></tr>
+        <tr><td><code>.sub-nav-actions</code></td><td>クラス</td><td>右寄せの主要アクション</td></tr>
+        <tr><td><code>.sub-nav-back</code></td><td>クラス</td><td>戻る導線の小さなリンク</td></tr>
+        <tr><td><code>@media (max-width: 480px)</code></td><td>メディアクエリ</td><td>余白・字間・ページ名サイズを詰める</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  min-height: var(--nav-height);
+  padding: 0 var(--space-lg);
+  background: var(--surface-black);
+  color: var(--body-on-dark);
+}</code></pre>
+      <p>
+        <code>position: sticky; top: 0</code> でスクロールしても常に上端に残ります。
+        背景は <code>--surface-black</code>（純黒）で、暗いコンテンツタイルの
+        <code>--surface-tile-1</code>（#272729）とは別の色です。純黒はナビ専用と
+        決めることで、ナビとページ内容が重なっても境界が分かります。
+      </p>
+      <p>
+        高さは <code>height</code> ではなく <code>min-height</code> です。
+        文字サイズを利用者が大きくした場合でも中身が切れず、バーの方が伸びます。
+        値は <code>--nav-height</code> で、サブナビの <code>top</code> と
+        同じ変数を共有しています。
+      </p>
+      <p>
+        <code>z-index: 20</code> はサブナビ（10）より大きく、2段が重なったときに
+        黒いバーが必ず上に来ます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.nav-brand {
+  color: var(--body-on-dark);
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caption);
+  white-space: nowrap;
+}</code></pre>
+      <p>
+        アプリ名は <code>&lt;Link&gt;</code> なので <code>base.css</code> の
+        <code>a</code> ルールで青になってしまいます。黒背景では読みづらいため
+        白に上書きしています。<code>white-space: nowrap</code> は
+        「車両メンテナンス記録」が狭い画面で2行に折り返し、バーの高さが
+        崩れるのを防ぐためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-left: auto;
+}
+
+.nav-link {
+  color: var(--body-on-dark);
+  font-size: var(--text-fine-size);
+  letter-spacing: var(--tracking-fine);
+  white-space: nowrap;
+}</code></pre>
+      <p>
+        <code>margin-left: auto</code> でリンク群を右端へ押しやります。
+        フレックスの余白を使う方法なので、ブランド名の文字数が変わっても
+        自動で追従します。
+      </p>
+      <p>
+        リンクの文字は 12px（<code>--text-fine-size</code>）と、本文より
+        かなり小さくしています。design.md の global-nav 仕様が
+        「静かなリンク」（12px / 400）を求めているためで、ナビが
+        コンテンツより主張しないようにする意図です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* サブナビ: 左にページ名、右にそのページの主要アクション */
+.sub-nav {
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 10;
+  ...
+  min-height: var(--sub-nav-height);
+  border-bottom: 1px solid var(--hairline-soft);
+  background: rgba(245, 245, 247, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}</code></pre>
+      <p>
+        <code>top: var(--nav-height)</code> により、黒いバーの<strong>真下</strong>に
+        貼り付きます。数値をベタ書きせず変数を共有しているので、ナビの高さを
+        変更しても2段が重なったり隙間が空いたりしません。
+      </p>
+      <p>
+        <strong>すりガラス</strong>の実装は、半透明の背景色
+        （<code>rgba(245, 245, 247, 0.8)</code>）と <code>backdrop-filter</code> の
+        組み合わせです。背後のコンテンツがぼけて透けることで、影を使わずに
+        「このバーは手前に浮いている」という奥行きを表現できます
+        （design.md が影の代わりに許している数少ない手段のひとつ）。
+        <code>-webkit-</code> 付きも併記しているのは Safari 向けです。
+      </p>
+      <p>
+        なお <code>backdrop-filter</code> に未対応のブラウザでも、
+        半透明の背景色だけは効くので、内容が読めなくなることはありません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.sub-nav-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-tagline-size);
+  font-weight: 600;
+  line-height: var(--leading-tagline);
+  letter-spacing: 0.231px;
+}
+
+.sub-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}</code></pre>
+      <p>
+        ページ名は 21px の display 書体です。これは <code>PageHeader</code> が
+        描画する <code>&lt;h1&gt;</code> で、<code>base.css</code> の
+        <code>h1</code>（40px）をここで上書きしています。
+        <strong>見た目は小さいがページの主見出し</strong>という扱いのため、
+        マークアップ上は <code>h1</code> のまま残しています。
+      </p>
+      <p>
+        <code>margin: 0</code> を明示しているのは、<code>base.css</code> の
+        <code>h1</code> が既に margin 0 であっても、このクラスだけを見て
+        「バーの高さに余計な余白が入らない」と保証できるようにするためです。
+      </p>
+      <p>
+        アクション側も <code>margin-left: auto</code> で右端へ寄せます。
+        ここに入るのは <code>.btn-primary</code> や <code>.btn-utility</code> で、
+        ページ名の長短にかかわらず操作の位置が一定に保たれます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 戻る導線はサブナビの上に小さく置く */
+.sub-nav-back {
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}</code></pre>
+      <p>
+        車両詳細から一覧へ戻るような導線用です。サブナビの主要アクションと
+        競合しないよう、14px のキャプションサイズに抑えています。色は
+        <code>base.css</code> のリンク色（アクセント青）をそのまま継承します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>@media (max-width: 480px) {
+  .nav,
+  .sub-nav {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+
+  .nav-links { gap: var(--space-sm); }
+
+  .sub-nav-title { font-size: var(--text-body-size); }
+}</code></pre>
+      <p>
+        ここが<strong>ハンバーガーの代わり</strong>です。左右余白を 24px → 17px、
+        リンク間隔を 24px → 12px に詰め、ページ名を 21px → 17px に縮めることで、
+        3つのリンクを横一列のまま収めます。開閉状態を持つメニューを作らずに
+        済むため、フォーカス管理・外側クリックでの閉じ処理・キーボード操作
+        といった実装とテストの負担がまるごと不要になります。
+      </p>
+      <p>
+        左右余白の 17px は <code>layout.css</code> の <code>.section</code> が
+        同じ 480px の境界で使う値と一致しており、ナビの左端とページ内容の
+        左端が縦に揃います。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/nav.css
+  </footer>
+
+</div>
+</body>
+</html>

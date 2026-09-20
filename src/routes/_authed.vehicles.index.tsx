@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 
+import { PageHeader } from '@/components/page-header'
 import { listVehiclesFn } from '@/features/vehicles/server/list'
 import { vehicleTypeLabel } from '@/features/vehicles/lib/vehicle-type'
 import type { VehicleType } from '@/features/vehicles/lib/vehicle-type'
@@ -19,24 +20,43 @@ function VehiclesIndexPage() {
   const vehicles = Route.useLoaderData()
 
   return (
-    <main>
-      <h1>車両一覧</h1>
-      <p>
-        <Link to="/vehicles/new">＋ 車両を登録</Link>
-      </p>
-      {vehicles.length === 0 ? (
-        <p>登録された車両はまだありません。</p>
-      ) : (
-        <ul>
-          {vehicles.map((vehicle) => (
-            <li key={vehicle.id}>
-              <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}>
-                {vehicle.name}（{vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}）
+    <>
+      <PageHeader
+        title="車両"
+        actions={
+          <Link to="/vehicles/new" className="btn btn-primary">
+            車両を登録
+          </Link>
+        }
+      />
+      <main className="section section-compact">
+        <div className="container">
+          {vehicles.length === 0 ? (
+            <div className="empty-state">
+              <p>登録された車両はまだありません。</p>
+              <Link to="/vehicles/new" className="btn btn-primary">
+                最初の車両を登録
               </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+            </div>
+          ) : (
+            <ul className="card-grid">
+              {vehicles.map((vehicle) => (
+                <li key={vehicle.id} className="card">
+                  <h2 className="card-title">
+                    <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}>
+                      {vehicle.name}
+                    </Link>
+                  </h2>
+                  <div className="card-meta">
+                    <span>{vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}</span>
+                    {vehicle.model_code && <span>{vehicle.model_code}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
+    </>
   )
 }

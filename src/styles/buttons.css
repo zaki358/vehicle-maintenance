@@ -1,0 +1,96 @@
+/*
+ * ボタンの文法は3つだけ（design.md の Buttons）。
+ * 押下時は全種類 scale(0.95)。hover 状態は定義しない。
+ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  border: none;
+  font-family: var(--font-text);
+  font-size: var(--text-body-size);
+  line-height: 1;
+  letter-spacing: var(--tracking-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.12s ease-out;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn:disabled {
+  color: var(--ink-muted-48);
+  cursor: not-allowed;
+}
+
+.btn:hover {
+  text-decoration: none;
+}
+
+/* 主要アクション。青のフルピル＝「押せる」の合図 */
+.btn-primary {
+  padding: 11px 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.btn-primary:disabled {
+  background: var(--hairline);
+}
+
+/* 2つ目のCTA。青の輪郭だけのゴーストピル */
+.btn-secondary {
+  padding: 11px 22px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+/* ナビ内の小さな実務アクション（ログアウト等） */
+.btn-utility {
+  min-height: 32px;
+  padding: 8px 15px;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--body-on-dark);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}
+
+/* 黒背景のナビ上では ink が沈むため、輪郭だけの淡色にする */
+.nav .btn-utility {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* カード内の控えめな第2アクション */
+.btn-pearl {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 3px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  color: var(--ink-muted-80);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}
+
+/* 横並びのアクション群 */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .btn-row > .btn {
+    flex: 1 1 100%;
+  }
+}

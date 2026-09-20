@@ -7,7 +7,6 @@ describe('completeShakenSchema', () => {
     performedOn: '2026-09-06',
     newExpiryDate: '2028-09-06',
     odometerKm: 12345,
-    partDetail: '継続検査',
     note: '特に指摘なし',
   }
 
@@ -19,7 +18,7 @@ describe('completeShakenSchema', () => {
     }
   })
 
-  it('odometerKm / partDetail / note を省略すると既定値になる', () => {
+  it('odometerKm / note を省略すると既定値になる', () => {
     const result = completeShakenSchema.safeParse({
       performedOn: '2026-09-06',
       newExpiryDate: '2028-09-06',
@@ -27,7 +26,6 @@ describe('completeShakenSchema', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.odometerKm).toBeNull()
-      expect(result.data.partDetail).toBe('')
       expect(result.data.note).toBe('')
     }
   })
@@ -57,18 +55,12 @@ describe('completeShakenSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('partDetail / note の前後の空白を trim する', () => {
-    const result = completeShakenSchema.safeParse({ ...validInput, partDetail: '  継続検査  ', note: '  特記なし  ' })
+  it('note の前後の空白を trim する', () => {
+    const result = completeShakenSchema.safeParse({ ...validInput, note: '  特記なし  ' })
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.partDetail).toBe('継続検査')
       expect(result.data.note).toBe('特記なし')
     }
-  })
-
-  it('partDetail が200文字を超えると拒否する', () => {
-    const result = completeShakenSchema.safeParse({ ...validInput, partDetail: 'あ'.repeat(201) })
-    expect(result.success).toBe(false)
   })
 
   it('note が1000文字を超えると拒否する', () => {

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cards.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>cards.css</h1>
+    <div class="doc-path">src/styles/cards.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      白いユーティリティカード（design.md の <code>store-utility-card</code>）と、
+      その派生である車検アラート・空状態・中央寄せカード・一覧行のスタイルです。
+      車両カード、整備記録の行、ログイン画面のカードなど、
+      アプリの一覧系・詳細系の見た目はほぼこのファイルで決まります。
+    </p>
+    <p>
+      <strong>カードに影は付けません。</strong>design.md の Shadow philosophy が
+      「影は製品写真のためだけのもので、カード・ボタン・文字には使わない」と
+      定めているためです。立体感は白 × parchment 背景の明度差と、
+      1px のヘアラインだけで表現します。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>.card</code></td><td>クラス</td><td>白いカードの基本形</td></tr>
+        <tr><td><code>.card-title</code></td><td>クラス</td><td>カード見出し（21px display）</td></tr>
+        <tr><td><code>.card-meta</code> / <code>-label</code></td><td>クラス</td><td>型式・区分などの小さな属性</td></tr>
+        <tr><td><code>.card-actions</code></td><td>クラス</td><td>カード下端に寄せる操作群</td></tr>
+        <tr><td><code>.card-alert</code></td><td>クラス</td><td>車検アラートの基底</td></tr>
+        <tr><td><code>.card-alert-warning</code></td><td>修飾クラス</td><td>軽度。明るい面</td></tr>
+        <tr><td><code>.card-alert-danger</code></td><td>修飾クラス</td><td>重度。暗いタイル</td></tr>
+        <tr><td><code>.empty-state</code></td><td>クラス</td><td>データが無いときの案内</td></tr>
+        <tr><td><code>.card-centered</code></td><td>修飾クラス</td><td>ログイン等、1枚だけ中央に置く</td></tr>
+        <tr><td><code>.list-row</code> ほか</td><td>クラス</td><td>整備記録の一覧行</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}</code></pre>
+      <p>
+        白・18px 角丸・1px のヘアライン・24px パディングという、
+        design.md の <code>store-utility-card</code> をそのまま写した形です。
+        影が無くても輪郭が見えるのは、ページ背景が純白ではなく
+        parchment（#f5f5f7）だからです（<code>base.css</code> の <code>body</code>）。
+      </p>
+      <p>
+        縦フレックスにしているのは、次に出てくる
+        <code>.card-actions { margin-top: auto }</code> を成立させるためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-tagline-size);
+  font-weight: 600;
+  line-height: var(--leading-tagline);
+}
+
+.card-title a { color: var(--ink); }</code></pre>
+      <p>
+        カード見出しは <code>&lt;h3&gt;</code> 相当の 21px です。
+        見出し全体がリンクになる場合（車両名をタップして詳細へ）でも、
+        文字色は <code>--ink</code> のままにします。カード全体が押せることは
+        文脈から明らかで、見出しまで青くすると一覧が青だらけになって
+        「どこが主要な操作か」が読み取れなくなるためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 「型式・区分」など、見出しの下に並べる小さな属性 */
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  font-size: var(--text-caption-size);
+  ...
+  color: var(--ink-muted-80);
+}
+
+.card-meta-label { color: var(--ink-muted-48); }</code></pre>
+      <p>
+        <code>gap</code> に2値（縦 8px / 横 17px）を指定しているのがポイントです。
+        折り返したときの行間は詰め、横方向は広めに取ることで、
+        「型式: ABC-123」「区分: 軽自動車」といった項目の切れ目が
+        区切り文字なしでも読み取れます。
+      </p>
+      <p>
+        ラベル部分だけ一段薄い色にして、値との主従を作ります。
+        ここでも太字や色ではなく、明度差だけで階層を表しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: auto;
+  padding-top: var(--space-sm);
+}</code></pre>
+      <p>
+        <code>margin-top: auto</code> により、カード内の余った縦方向の空きを
+        すべて上側に押し付け、操作ボタンを<strong>カードの下端</strong>に固定します。
+        グリッドに並ぶカードは高さが揃うため（<code>.card-grid</code> の
+        既定の <code>stretch</code>）、備考の長さが違っても
+        全カードのボタンが同じ高さに並びます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 車検アラート。色を足さず、段階を面の明暗で表す */
+.card-alert {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption-size);
+  ...
+}
+
+.card-alert-warning {
+  border: 1px solid var(--hairline);
+  background: var(--canvas-parchment);
+  color: var(--ink-muted-80);
+}
+
+.card-alert-danger {
+  background: var(--surface-tile-1);
+  color: var(--body-on-dark);
+}
+
+.card-alert-danger a { color: var(--color-primary-on-dark); }</code></pre>
+      <p>
+        <strong>危険（期限切れ間近・超過）が赤くない理由</strong> —
+        design.md は「第2のアクセント色を導入してはならない」と明確に禁じています。
+        赤を足すと、このシステムで唯一「押せる」を意味していた青の役割が薄まり、
+        色の意味づけ全体が崩れます。
+      </p>
+      <p>
+        そこで深刻度は<strong>面の明暗</strong>で表します。
+        警告（<code>-warning</code>）は白いカードの中の少し暗い灰色の箱、
+        危険（<code>-danger</code>）は白いカードの中の暗いタイルです。
+        白地に黒い箱が現れるコントラストは赤に劣らず目を引き、
+        色覚特性にも依存しません。
+      </p>
+      <p>
+        暗いタイルの上のリンク（「車検を記録する」など）は
+        <code>--color-primary-on-dark</code> に差し替えて可読性を確保します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 何も無いときの案内 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xxl) var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  text-align: center;
+  color: var(--ink-muted-80);
+}</code></pre>
+      <p>
+        車両も記録も無い初回利用時に出す箱です。カードと同じ白・同じ角丸を
+        使いつつ、中身を中央寄せにして上下に厚い余白（48px）を取ります。
+        「壊れているのではなく、まだ何も登録していないだけ」だと
+        一目で伝わり、中央に置いた主ボタンへ視線が向かいます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* ログイン等、1枚だけ中央に置くカード */
+.card-centered {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  gap: var(--space-lg);
+}</code></pre>
+      <p>
+        ログイン画面とパスワード設定画面で使う修飾クラスです。
+        <code>.card</code> と併用する前提で、幅・中央寄せ・余白だけを上書きします。
+        420px は入力欄1列がちょうど収まる幅で、パディングと
+        内部 gap も1段広げて、単独で置かれたときの間の持たなさを補います。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 記録の一覧行 */
+.list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.list-row:last-child { border-bottom: none; }</code></pre>
+      <p>
+        整備記録の一覧は、1件ずつカードにすると縦に長くなりすぎるため、
+        区切り線で仕切った行にしています。<code>align-items: baseline</code> に
+        することで、サイズの違う文字（日付・作業名・走行距離）の
+        <strong>文字の下端</strong>が揃い、きれいな1行に見えます。
+      </p>
+      <p>
+        最後の行だけ下線を消すのは、カードの内枠と二重線になるのを
+        避けるためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.list-row-primary { font-weight: 600; }
+
+.list-row-meta {
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+  color: var(--ink-muted-80);
+}
+
+/* 行の操作ボタンは右端に寄せる（縦積みのカードでは .card-actions が上詰めになる） */
+.list-row .card-actions {
+  margin-left: auto;
+  padding-top: 0;
+}</code></pre>
+      <p>
+        <code>.card-actions</code> は縦積みのカード用に
+        <code>margin-top: auto</code> を持っていますが、
+        <code>.list-row</code> は<strong>横並び</strong>のフレックスなので、
+        そのままでは意図した位置に来ません。そこで行の中でだけ
+        <code>margin-left: auto</code> に読み替え、ボタンを右端へ寄せます。
+        上パディングも 0 に戻し、行の高さが不必要に増えないようにしています。
+      </p>
+      <p>
+        クラス名を増やさず、<strong>文脈による上書き</strong>で挙動を
+        切り替えているのは <code>buttons.css</code> の
+        <code>.nav .btn-utility</code> と同じ考え方です。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/cards.css
+  </footer>
+
+</div>
+</body>
+</html>

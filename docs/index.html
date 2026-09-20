@@ -210,7 +210,7 @@
   </section>
 
   <section class="doc-section" id="files">
-    <h2>ファイル別解説（全64ファイル）</h2>
+    <h2>ファイル別解説（全72ファイル）</h2>
     <p class="index-group-desc">機能（feature）単位でグループ化した、各ソースファイルの個別解説ページへのリンク集です。</p>
 
     <h3 id="routes">ルート / ページ（src/routes）</h3>
@@ -224,9 +224,26 @@
       <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.html"><div class="index-card-title">_authed.vehicles.$vehicleId.tsx</div><div class="index-card-path">車両詳細レイアウト</div></a>
       <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.index.html"><div class="index-card-title">_authed.vehicles.$vehicleId.index.tsx</div><div class="index-card-path">車両詳細・整備記録一覧</div></a>
       <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.edit.html"><div class="index-card-title">_authed.vehicles.$vehicleId.edit.tsx</div><div class="index-card-path">車両編集</div></a>
-      <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.shaken.html"><div class="index-card-title">_authed.vehicles.$vehicleId.shaken.tsx</div><div class="index-card-path">車検完了記録ページ</div></a>
       <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.records.new.html"><div class="index-card-title">_authed.vehicles.$vehicleId.records.new.tsx</div><div class="index-card-path">整備記録の新規登録</div></a>
       <a class="index-card" href="src/routes/_authed.vehicles.$vehicleId.records.$recordId.edit.html"><div class="index-card-title">…records.$recordId.edit.tsx</div><div class="index-card-path">整備記録の編集</div></a>
+    </div>
+
+    <h3 id="design-system">デザインシステム（src/styles・src/components）</h3>
+    <p class="index-group-desc">
+      <a href="design.md">design.md</a> を唯一の基準として組んだ、色・文字・余白・角丸のトークンと共通部品です。
+      各ファイルに生の色コードは書かず、必ず <code>tokens.css</code> を参照します。
+    </p>
+    <div class="index-grid">
+      <a class="index-card" href="src/styles.html"><div class="index-card-title">styles.css</div><div class="index-card-path">読み込みの入口</div></a>
+      <a class="index-card" href="src/styles/tokens.html"><div class="index-card-title">styles/tokens.css</div><div class="index-card-path">色・文字・余白・角丸の定義</div></a>
+      <a class="index-card" href="src/styles/base.html"><div class="index-card-title">styles/base.css</div><div class="index-card-path">リセットと地の文</div></a>
+      <a class="index-card" href="src/styles/layout.html"><div class="index-card-title">styles/layout.css</div><div class="index-card-path">ページの骨格・グリッド</div></a>
+      <a class="index-card" href="src/styles/nav.html"><div class="index-card-title">styles/nav.css</div><div class="index-card-path">上部2段ナビ</div></a>
+      <a class="index-card" href="src/styles/buttons.html"><div class="index-card-title">styles/buttons.css</div><div class="index-card-path">ボタンの3文法</div></a>
+      <a class="index-card" href="src/styles/forms.html"><div class="index-card-title">styles/forms.css</div><div class="index-card-path">入力欄・エラー表示</div></a>
+      <a class="index-card" href="src/styles/cards.html"><div class="index-card-title">styles/cards.css</div><div class="index-card-path">カード・一覧行・アラート</div></a>
+      <a class="index-card" href="src/components/app-nav.html"><div class="index-card-title">components/app-nav.tsx</div><div class="index-card-path">全ページ共通のナビ</div></a>
+      <a class="index-card" href="src/components/page-header.html"><div class="index-card-title">components/page-header.tsx</div><div class="index-card-path">ページ名と主要アクション</div></a>
     </div>
 
     <h3 id="auth">機能: 認証（src/features/auth）</h3>
@@ -274,7 +291,6 @@
 
     <h3 id="shaken">機能: 車検（src/features/shaken）</h3>
     <div class="index-grid">
-      <a class="index-card" href="src/features/shaken/complete-shaken-form.html"><div class="index-card-title">complete-shaken-form.tsx</div></a>
       <a class="index-card" href="src/features/shaken/lib/alert-tier.html"><div class="index-card-title">lib/alert-tier.ts</div></a>
       <a class="index-card" href="src/features/shaken/lib/days-remaining.html"><div class="index-card-title">lib/days-remaining.ts</div></a>
       <a class="index-card" href="src/features/shaken/lib/renewal.html"><div class="index-card-title">lib/renewal.ts</div></a>

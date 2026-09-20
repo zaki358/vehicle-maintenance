@@ -2,6 +2,55 @@ import { describe, expect, it } from 'vitest'
 
 import { vehicleSchema } from './vehicle-schema'
 
+describe('vehicleSchema（型式）', () => {
+  it('型式を入力すればそのまま受け取る', () => {
+    const result = vehicleSchema.safeParse({
+      name: 'スイフトスポーツ',
+      modelCode: 'ZC33S',
+      vehicleType: 'car',
+      shakenExpiryDate: null,
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.data?.modelCode).toBe('ZC33S')
+  })
+
+  it('型式は任意（未指定なら空文字）', () => {
+    const result = vehicleSchema.safeParse({
+      name: 'カブ',
+      vehicleType: 'motorcycle',
+      shakenExpiryDate: null,
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.data?.modelCode).toBe('')
+  })
+
+  it('型式の前後の空白は取り除く', () => {
+    const result = vehicleSchema.safeParse({
+      name: 'スイフトスポーツ',
+      modelCode: '  ZC33S  ',
+      vehicleType: 'car',
+      shakenExpiryDate: null,
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.data?.modelCode).toBe('ZC33S')
+  })
+
+  it('型式が長すぎるとエラー', () => {
+    const result = vehicleSchema.safeParse({
+      name: 'スイフトスポーツ',
+      modelCode: 'あ'.repeat(51),
+      vehicleType: 'car',
+      shakenExpiryDate: null,
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.message).toBe('型式は50文字以内で入力してください')
+  })
+})
+
 describe('vehicleSchema', () => {
   const validInput = {
     name: 'アルファード',
@@ -14,7 +63,7 @@ describe('vehicleSchema', () => {
     const result = vehicleSchema.safeParse(validInput)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data).toEqual(validInput)
+      expect(result.data).toEqual({ ...validInput, modelCode: '' })
     }
   })
 

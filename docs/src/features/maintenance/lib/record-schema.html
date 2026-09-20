@@ -17,15 +17,23 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      整備記録（日付・作業内容・走行距離・部品/型式・備考）の登録・編集フォーム
-      入力を検証する Zod スキーマです。<code>vehicle-schema.ts</code> と同様、
-      「全書き込みはサーバー関数の入口で Zod 検証する」というプロジェクト方針に
-      沿っています。
+      整備記録の登録・編集フォームの入力を検証する Zod スキーマです。
+      フォーム側（<code>record-form.tsx</code>）の送信前チェックと、
+      サーバー関数（<code>server/create.ts</code> / <code>server/update.ts</code>）の
+      入口検証の<strong>両方</strong>がこの同じスキーマを使います。
+      サーバー関数は実 HTTP エンドポイントなので、クライアント側の検証は信用せず
+      必ずサーバー側でも通します。
     </p>
     <p>
-      このファイルでいちばん重要なのは、単純なフィールド単位の検証では表現できない
-      「作業内容が『その他』のときだけ自由入力欄が必須になる」というルールです。
-      これは <code>.refine()</code> によるオブジェクト全体の相互検証で実現しています。
+      このスキーマの特徴は、<strong>必須項目が作業内容の区分によって変わる</strong>
+      ことです（部品交換なら交換内容と部品型式が必須、調整なら調整内容だけ、など）。
+      どの欄をどう扱うかの判断は自分で持たず、すべて
+      <code>workTypeFields()</code>（<code>work-types.ts</code>）に委ねます。
+      フォームの描画とこの検証が同じ定義を読むため、画面と検証がずれません。
+    </p>
+    <p>
+      さらに検証のあと、<strong>その区分では使わない項目を空へ戻す</strong>
+      <code>.transform()</code> を挟んでいます。これがこのファイルのもう一つの役割です。
     </p>
   </section>
 
@@ -36,8 +44,12 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>recordSchema</code></td><td>const（export）</td><td>整備記録フォーム入力を検証する Zod スキーマ</td></tr>
-        <tr><td><code>RecordInput</code></td><td>type（export）</td><td><code>recordSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>DETAIL_MAX_LENGTH</code></td><td>const（非export）</td><td>作業内容の最大文字数（100）</td></tr>
+        <tr><td><code>PART_DETAIL_MAX_LENGTH</code></td><td>const（非export）</td><td>部品型式の最大文字数（200）</td></tr>
+        <tr><td><code>OIL_TYPE_MAX_LENGTH</code></td><td>const（非export）</td><td>油種の最大文字数（50）</td></tr>
+        <tr><td><code>NOTE_MAX_LENGTH</code></td><td>const（非export）</td><td>備考の最大文字数（1000）</td></tr>
+        <tr><td><code>recordSchema</code></td><td>Zod スキーマ（export）</td><td>object → superRefine → transform の3段構成</td></tr>
+        <tr><td><code>RecordInput</code></td><td>type（export）</td><td><code>z.infer</code> による出力型</td></tr>
       </tbody>
     </table>
   </section>
@@ -46,14 +58,32 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
+      <pre><code>const DETAIL_MAX_LENGTH = 100
+const PART_DETAIL_MAX_LENGTH = 200
+const OIL_TYPE_MAX_LENGTH = 50
+const NOTE_MAX_LENGTH = 1000</code></pre>
+      <p>
+        上限値を定数に切り出し、エラーメッセージにもテンプレートリテラルで
+        埋め込んでいます（<code>内容は100文字以内で入力してください</code>）。
+        値と文言が二重管理にならず、上限を変えたときに文言が古いまま残りません。
+      </p>
+      <p>
+        DB 側（<code>maintenance_records</code> テーブル）はこれらの列を
+        <code>text</code> で持ち、文字数の上限を持ちません。「長さの上限は
+        アプリの入力ポリシー、構造は DB」という役割分担で、マイグレーションの
+        コメントにも同じ方針が書かれています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
       <pre><code>export const recordSchema = z
   .object({
     performedOn: dateStringSchema,
     workType: z.enum(WORK_TYPES, { error: '作業内容を選択してください' }),
-    workTypeOther: z
+    detail: z
       .string()
       .trim()
-      .max(WORK_TYPE_OTHER_MAX_LENGTH, `作業内容は${WORK_TYPE_OTHER_MAX_LENGTH}文字以内で入力してください`)
+      .max(DETAIL_MAX_LENGTH, `内容は${DETAIL_MAX_LENGTH}文字以内で入力してください`)
       .default(''),
     odometerKm: z
       .number()
@@ -61,68 +91,133 @@
       .nonnegative('走行距離は0以上で入力してください')
       .nullable()
       .default(null),
-    partDetail: z
-      .string()
-      .trim()
-      .max(PART_DETAIL_MAX_LENGTH, `部品/型式は${PART_DETAIL_MAX_LENGTH}文字以内で入力してください`)
-      .default(''),
-    note: z
-      .string()
-      .trim()
-      .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
-      .default(''),
+    ...
   })</code></pre>
       <p>
-        フィールドごとの検証です。
+        <strong>日付</strong> — <code>performedOn</code> には共通の
+        <code>dateStringSchema</code> を使い、branded な <code>DateString</code>
+        として扱います。Cloudflare Workers は常に <code>TZ=UTC</code> で動くため、
+        日付を <code>Date</code> に変換するとタイムゾーンずれが発生します。
+        文字列のまま扱うのがこのプロジェクトの原則です。
       </p>
       <p>
-        <strong><code>performedOn</code></strong> — <code>src/lib/date/date-string-schema.ts</code>
-        の共有スキーマをそのまま使い、<code>vehicle-schema.ts</code> と同じ基準で
-        日付を検証します。
+        <strong>区分</strong> — <code>z.enum(WORK_TYPES)</code> により、
+        <code>work-types.ts</code> の9区分以外は入口で弾かれます。区分を増減したときに
+        スキーマ側を直す必要はありません。
       </p>
       <p>
-        <strong><code>workType</code></strong> — <code>work-types.ts</code> の
-        <code>WORK_TYPES</code>（7つのプリセット）から選ばれた値だけを許可します。
+        <strong>テキスト欄</strong> — <code>detail</code> / <code>partDetail</code> /
+        <code>oilType</code> / <code>note</code> はいずれも <code>.trim().max(...)</code>
+        <code>.default('')</code> の形です。<code>trim()</code> を先に通すことで、
+        空白だけの入力は空文字になり、後述の必須チェックで「未入力」として弾かれます。
+        未入力を <code>null</code> ではなく空文字に統一しているのは、DB 側の列も
+        <code>not null default ''</code> で定義されているためです（「未入力」の
+        表現が2つに分かれるのを避ける）。
       </p>
       <p>
-        <strong><code>odometerKm</code></strong> — 整数かつ0以上。<code>.nullable().default(null)</code>
-        により、フォームで未入力（<code>undefined</code>）でも「不明」を意味する
-        <code>null</code> として保存されます。前回記録との比較は
-        <code>odometer.ts</code> の役割で、ここでは単体の値としての妥当性だけを見ます。
+        <strong>走行距離</strong> — <code>odometerKm</code> の <code>null</code> は
+        エラーではなく「走行距離を記録しなかった」という<strong>正常値</strong>です。
+        整数・0以上のみ許可します。
       </p>
       <p>
-        <strong><code>workTypeOther</code> / <code>partDetail</code> / <code>note</code></strong> —
-        いずれも <code>.trim()</code> 後に文字数上限、未入力時は空文字が既定値です。
+        <strong>エレメント交換</strong> — <code>elementChanged</code> は
+        <code>z.boolean().default(false)</code>。チェックボックス1つに対応します。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>  .refine((data) => !isOtherWorkType(data.workType) || data.workTypeOther.length > 0, {
-    message: '作業内容が「その他」の場合は内容を入力してください',
-    path: ['workTypeOther'],
+      <pre><code>  .superRefine((data, ctx) => {
+    const fields = workTypeFields(data.workType)
+
+    if (fields.detail === 'required' && data.detail.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${fields.detailLabel}を入力してください`,
+        path: ['detail'],
+      })
+    }
+
+    if (fields.partDetail === 'required' && data.partDetail.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '部品型式を入力してください',
+        path: ['partDetail'],
+      })
+    }
   })</code></pre>
       <p>
-        「<code>workType</code> が <code>other</code>」と「<code>workTypeOther</code> が
-        空でない」という2フィールドにまたがる条件なので、単一フィールドの
-        <code>.min()</code> などでは表現できません。オブジェクト全体を検証する
-        <code>.refine()</code> を使い、条件式は
-        <code>!isOtherWorkType(...) || workTypeOther.length > 0</code>
-        —「その他でない、または、その他だが入力済み」という論理積の否定形です。
-        <code>work-types.ts</code> の <code>isOtherWorkType</code> をそのまま使うことで、
-        「その他かどうか」の判定基準がこのファイルとプリセット定義側でズレません。
+        <strong>区分に依存する必須チェック</strong>です。<code>detail</code> と
+        <code>partDetail</code> は個々のフィールド定義では必須にできません
+        （区分によって必須かどうかが変わるため）。そこでオブジェクト全体が
+        揃ったあとの <code>superRefine</code> で、<code>workTypeFields()</code> に
+        問い合わせてから判定します。
       </p>
       <p>
-        <code>path: ['workTypeOther']</code> を指定しているのは、エラーメッセージを
-        フォームの <code>workTypeOther</code> 欄の下に表示できるようにするためです。
-        指定しないとエラーがオブジェクト全体（<code>path: []</code>）に紐づき、
-        どのフィールドが悪いのか画面側で判別しづらくなります。
+        エラーメッセージが <code>fields.detailLabel</code> から組み立てられているのが
+        ポイントです。部品交換なら「交換内容を入力してください」、修理なら
+        「修理内容を入力してください」と、画面に出ているラベルと必ず同じ言葉になります。
+        文言をスキーマ側にベタ書きしていたら、ラベルを変えたときにここだけ古くなります。
+      </p>
+      <p>
+        <code>refine</code> ではなく <code>superRefine</code> を使っているのは、
+        複数のエラーを <code>path</code> 付きで積めるためです。ただし現状の
+        フォームは <code>issues[0]</code> のみを表示します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  .transform((data) => {
+    const fields = workTypeFields(data.workType)
+
+    return {
+      ...data,
+      detail: fields.detail === 'hidden' ? '' : data.detail,
+      partDetail: fields.partDetail === 'hidden' ? '' : data.partDetail,
+      oilType: fields.oilType ? data.oilType : '',
+      elementChanged: fields.elementChanged ? data.elementChanged : false,
+    }
+  })</code></pre>
+      <p>
+        <strong>その区分では使わない値を落とす正規化</strong>です。フォームは
+        区分を切り替えても入力値を保持する設計（「部品交換」で書いた内容を
+        「修理」に付け替えられるようにするため）なので、送信時に前の区分の入力が
+        残っていることがあります。それをそのまま保存すると、例えば
+        <strong>車検の行に部品型式が入る</strong>ような、読み直したときに意味の
+        通らない行ができてしまいます。
+      </p>
+      <p>
+        この <code>transform</code> が保存直前に空へ戻すため、DB には区分と
+        整合した行だけが入ります。マイグレーション
+        <code>20260920110100_rework_maintenance_work_types.sql</code> の CHECK 制約とも
+        整合する形です。
+      </p>
+      <p>
+        <code>{ ...data, ... }</code> と新しいオブジェクトを返しており、引数の
+        <code>data</code> は書き換えていません（プロジェクト全体の不変データ方針）。
+      </p>
+      <p>
+        <strong>副作用として型が ZodEffects になる</strong>点に注意が必要です。
+        <code>superRefine</code> / <code>transform</code> を挟んだスキーマは
+        <code>.shape</code> を持たないため、<code>server/create.ts</code> では
+        <code>vehicleScopeSchema.extend(recordSchema.shape)</code> のような合成ができず、
+        <code>.extend({ record: recordSchema })</code> とネストさせる形を取っています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export type RecordInput = z.infer&lt;typeof recordSchema&gt;</code></pre>
+      <p>
+        <code>z.infer</code> は <code>transform</code> 後の<strong>出力型</strong>を
+        返します。フォームの <code>initialValues</code> やサーバー関数の引数は
+        この型で受け渡しされるため、スキーマを変えれば呼び出し側の型も自動的に
+        追従します。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/record-schema.ts
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/maintenance/lib/record-schema.ts
   </footer>
 
 </div>

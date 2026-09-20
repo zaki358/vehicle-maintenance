@@ -39,6 +39,6 @@ test.describe('ルートガード', () => {
     await page.getByRole('button', { name: 'ログイン' }).click()
 
     await expect(page).toHaveURL('/vehicles')
-    await expect(page.getByRole('heading', { name: '車両一覧' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '車両' })).toBeVisible()
   })
 })

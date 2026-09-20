@@ -17,11 +17,24 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      整備記録の「作業内容」プリセット（エンジンオイル、オイルエレメント、タイヤ、
-      ブレーキパッド、バッテリー、車検、その他）を定義するファイルです。
-      このプリセットは DB の <code>work_type</code> 列にそのまま保存する値なので、
-      画面・スキーマ検証・DBのどこから見ても同じ値の集合を参照できるよう、
-      ここで一度だけ定義しています。
+      整備記録の「作業内容」の区分（DB の <code>work_type</code> 列に保存する値）と、
+      区分ごとに<strong>どの入力欄を出すか・必須か</strong>を定義する純粋モジュールです。
+      React も Supabase も import しないため、フォーム・Zod スキーマ・テストの
+      どこからでも同じ定義を参照できます。
+    </p>
+    <p>
+      旧版の区分は <code>engine_oil</code> / <code>oil_element</code> / <code>tire</code> /
+      <code>brake_pad</code> / <code>battery</code> / <code>shaken</code> / <code>other</code> と、
+      <strong>「何を交換したか」を区分名そのもの</strong>で表していました。この形は
+      対象部品が増えるたびに区分を増やさなければならず、自由入力の
+      <code>work_type_other</code> 列も必要でした。現在の9区分は
+      <strong>「どういう作業か」</strong>で分け、具体的な対象は <code>detail</code> 列に書きます。
+      これで区分を増やさずに任意の整備を記録できます。
+    </p>
+    <p>
+      このファイルの中心は <code>workTypeFields()</code> です。フォームが描画する欄と
+      <code>recordSchema</code> が必須にする項目が<strong>同じ1か所</strong>を読むため、
+      「画面には出ていないのに検証で必須にされる」といったずれが構造的に起きません。
     </p>
   </section>
 
@@ -32,10 +45,14 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>WORK_TYPES</code></td><td>const（export）</td><td>作業内容プリセット7種類の配列</td></tr>
-        <tr><td><code>WorkType</code></td><td>type（export）</td><td><code>WORK_TYPES</code> の要素から推論した文字列リテラル型</td></tr>
-        <tr><td><code>workTypeLabel</code></td><td>function（export）</td><td>プリセット値から日本語ラベルを返す</td></tr>
-        <tr><td><code>isOtherWorkType</code></td><td>function（export）</td><td>「その他」が選ばれているかを判定する</td></tr>
+        <tr><td><code>WORK_TYPES</code></td><td>const（export）</td><td>作業内容9区分の識別子。<code>as const</code> のタプル</td></tr>
+        <tr><td><code>WorkType</code></td><td>type（export）</td><td><code>WORK_TYPES</code> の要素のユニオン型</td></tr>
+        <tr><td><code>FieldRequirement</code></td><td>type（export）</td><td>入力欄の扱い（<code>'required'</code> / <code>'optional'</code> / <code>'hidden'</code>）</td></tr>
+        <tr><td><code>WorkTypeFields</code></td><td>interface（export）</td><td>1区分あたりの入力欄の構成を表す</td></tr>
+        <tr><td><code>workTypeLabel</code></td><td>function（export）</td><td>区分 → 画面表示用の日本語ラベル</td></tr>
+        <tr><td><code>HIDDEN_DETAIL</code></td><td>const（非export）</td><td><code>detail</code> 欄を使わない区分のための共通断片</td></tr>
+        <tr><td><code>workTypeFields</code></td><td>function（export）</td><td>区分 → 使う入力欄と必須性。<strong>唯一の情報源</strong></td></tr>
+        <tr><td><code>isShakenWorkType</code></td><td>function（export）</td><td>車検かどうか（保存経路の分岐に使う）</td></tr>
       </tbody>
     </table>
   </section>
@@ -46,25 +63,56 @@
     <div class="doc-chunk">
       <pre><code>export const WORK_TYPES = [
   'engine_oil',
-  'oil_element',
-  'tire',
-  'brake_pad',
-  'battery',
+  'fluid',
+  'part',
+  'repair',
+  'adjust',
+  'tuning',
+  'modification',
   'shaken',
   'other',
 ] as const
 
 export type WorkType = (typeof WORK_TYPES)[number]</code></pre>
       <p>
-        値の一覧を配列リテラルとして定義し、そこから型を逆算しています。
-        <code>as const</code> を付けることで配列の各要素が広い <code>string</code>
-        ではなく個々のリテラル型として扱われ、<code>(typeof WORK_TYPES)[number]</code>
-        で「配列の要素のどれか」というユニオン型を取り出せます。値の一覧と型の
-        2箇所を手で同期させる必要が無くなるのが利点です。
+        9区分は「エンジンオイル / 油脂類交換 / 部品交換 / 修理 / 調整 /
+        チューニング / 改造 / 車検 / その他」です。<code>as const</code> を付けることで
+        配列が読み取り専用のタプル型になり、<code>(typeof WORK_TYPES)[number]</code> から
+        リテラルのユニオン型 <code>WorkType</code> が導出されます。値の一覧
+        （<code>select</code> の選択肢や <code>z.enum()</code> に渡すもの）と型が
+        必ず一致し、区分を追加すると <code>workTypeLabel</code> /
+        <code>workTypeFields</code> の <code>switch</code> が網羅性チェックで
+        コンパイルエラーになるため、対応漏れがビルド時に見つかります。
       </p>
       <p>
-        この配列はそのまま <code>record-schema.ts</code> の
-        <code>z.enum(WORK_TYPES, ...)</code> にも渡され、Zod の検証対象にもなります。
+        並び順はそのままフォームの選択肢の並びになります。<code>WORK_TYPES[0]</code>
+        （<code>engine_oil</code>）が新規登録時の初期値です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export type FieldRequirement = 'required' | 'optional' | 'hidden'
+
+export interface WorkTypeFields {
+  detail: FieldRequirement
+  detailLabel: string
+  partDetail: FieldRequirement
+  oilType: boolean
+  elementChanged: boolean
+}</code></pre>
+      <p>
+        <code>detail</code> と <code>partDetail</code> は3状態
+        （必須・任意・その区分では使わない）を取るため <code>FieldRequirement</code> で
+        表します。一方 <code>oilType</code>（油種）と <code>elementChanged</code>
+        （オイルエレメント同時交換）は、使う区分では常に任意入力なので
+        「出すか出さないか」の真偽値で足ります。
+      </p>
+      <p>
+        <code>detailLabel</code> が型に含まれているのが要点です。<code>detail</code> 列は
+        区分によって意味が変わる（部品交換なら「交換内容」、修理なら「修理内容」、
+        油脂類交換なら「交換箇所」）ため、画面ラベルを固定にできません。
+        画面の見出しも、必須エラーの文言（<code>recordSchema</code> が
+        「〜を入力してください」として組み立てる）も、すべてここから取ります。
       </p>
     </div>
 
@@ -73,49 +121,134 @@ export type WorkType = (typeof WORK_TYPES)[number]</code></pre>
   switch (type) {
     case 'engine_oil':
       return 'エンジンオイル'
-    case 'oil_element':
-      return 'オイルエレメント'
-    case 'tire':
-      return 'タイヤ'
-    case 'brake_pad':
-      return 'ブレーキパッド'
-    case 'battery':
-      return 'バッテリー'
-    case 'shaken':
-      return '車検'
+    case 'fluid':
+      return '油脂類交換'
+    ...
     case 'other':
       return 'その他'
   }
 }</code></pre>
       <p>
-        画面表示用の日本語ラベルに変換するだけの関数です。<code>switch</code> が
-        <code>WorkType</code> の全パターンを網羅しているため、将来
-        <code>WORK_TYPES</code> に値を追加した際は、この <code>switch</code> の
-        分岐を足し忘れると TypeScript が「網羅していない」というエラーで
-        教えてくれます。
+        DB に保存する識別子は英語（スキーマの安定性のため）、画面に出すのは日本語、
+        という分離をこの関数が担います。<code>default</code> 節を置かずに全ケースを
+        書き切っているため、区分を増やして <code>case</code> を書き忘れると
+        「戻り値に <code>undefined</code> が混じる」として型エラーになります。
+        意図的に網羅性チェックを効かせた書き方です。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>export function isOtherWorkType(type: WorkType): boolean {
-  return type === 'other'
+      <pre><code>const HIDDEN_DETAIL = { detail: 'hidden', detailLabel: '' } as const</code></pre>
+      <p>
+        <code>detail</code> 欄を使わない区分（<code>engine_oil</code> と
+        <code>shaken</code>）で使い回す断片です。<code>detail: 'hidden'</code> のときは
+        <code>detailLabel</code> を空文字にする、という決まりを1か所に固定しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function workTypeFields(type: WorkType): WorkTypeFields {
+  switch (type) {
+    case 'engine_oil':
+      return { ...HIDDEN_DETAIL, partDetail: 'hidden', oilType: true, elementChanged: true }
+    case 'fluid':
+      return {
+        detail: 'required',
+        detailLabel: '交換箇所',
+        partDetail: 'hidden',
+        oilType: true,
+        elementChanged: false,
+      }
+    case 'part':
+      return {
+        detail: 'required',
+        detailLabel: '交換内容',
+        partDetail: 'required',
+        oilType: false,
+        elementChanged: false,
+      }
+    ...
+    case 'shaken':
+      return { ...HIDDEN_DETAIL, partDetail: 'hidden', oilType: false, elementChanged: false }
+    case 'other':
+      return {
+        detail: 'required',
+        detailLabel: '作業内容',
+        partDetail: 'optional',
+        oilType: false,
+        elementChanged: false,
+      }
+  }
 }</code></pre>
       <p>
-        「その他」が選ばれているかどうかを判定するだけの小さな関数ですが、
-        独立させているのには理由があります。「その他」を選んだときだけ
-        自由入力欄（<code>work_type_other</code>）が必須になるという業務ルールが
-        あり、このルールは <code>record-schema.ts</code> の検証、
-        フォームコンポーネントの表示切り替えなど複数箇所から参照されます。
-        <code>type === 'other'</code> という比較を各所に直接書くのではなく、
-        名前の付いた関数にすることで「なぜその判定をしているか」がコードだけで
-        伝わるようにしています。
+        <strong>このファイルの核心</strong>です。区分ごとの入力欄構成をまとめると
+        次のようになります（「―」はその区分では使わない欄）。
+      </p>
+      <table class="doc-structure">
+        <thead>
+          <tr><th>区分</th><th>detail</th><th>part_detail</th><th>oil_type</th><th>element_changed</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>エンジンオイル（engine_oil）</td><td>―</td><td>―</td><td>使う</td><td>使う</td></tr>
+          <tr><td>油脂類交換（fluid）</td><td>必須「交換箇所」</td><td>―</td><td>使う</td><td>―</td></tr>
+          <tr><td>部品交換（part）</td><td>必須「交換内容」</td><td>必須</td><td>―</td><td>―</td></tr>
+          <tr><td>修理（repair）</td><td>必須「修理内容」</td><td>任意</td><td>―</td><td>―</td></tr>
+          <tr><td>調整（adjust）</td><td>必須「調整内容」</td><td>―</td><td>―</td><td>―</td></tr>
+          <tr><td>チューニング（tuning）</td><td>必須「チューニング内容」</td><td>任意</td><td>―</td><td>―</td></tr>
+          <tr><td>改造（modification）</td><td>必須「改造内容」</td><td>任意</td><td>―</td><td>―</td></tr>
+          <tr><td>車検（shaken）</td><td>―</td><td>―</td><td>―</td><td>―</td></tr>
+          <tr><td>その他（other）</td><td>必須「作業内容」</td><td>任意</td><td>―</td><td>―</td></tr>
+        </tbody>
+      </table>
+      <p>
+        なお <code>performedOn</code>（作業日）・<code>odometerKm</code>（走行距離）・
+        <code>note</code>（備考）は全区分共通のため、この関数は扱いません。
+      </p>
+      <p>
+        <strong>なぜ <code>engine_oil</code> と <code>shaken</code> だけ
+        <code>detail</code> が不要か</strong> — この2つは区分名そのものが作業内容を
+        表しているためです。エンジンオイルなら油種とエレメント交換の有無、
+        車検なら走行距離と備考があれば記録として成立します。
+      </p>
+      <p>
+        <strong>なぜ <code>part</code> だけ部品型式が必須か</strong> — 部品交換は
+        「どの部品を入れたか」が記録の核だからです。修理・チューニング・改造・
+        その他では、部品を伴わない作業もありうるので任意にしています。
+      </p>
+      <p>
+        <strong>DB 側の制約と対応している</strong> — この表の必須・不要の別は
+        <code>20260920110100_rework_maintenance_work_types.sql</code> の
+        <code>maintenance_records_detail_required</code> と
+        <code>maintenance_records_part_detail_required</code> の CHECK 制約と
+        同じ内容です。画面・サーバー関数入口の Zod・DB の3層で同じルールを
+        守る形になっており、どこを迂回されても不正な行は入りません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function isShakenWorkType(type: WorkType): boolean {
+  return type === 'shaken'
+}</code></pre>
+      <p>
+        車検の記録は<strong>保存経路が他と違う</strong>ため、判定を関数として
+        切り出しています。整備記録の <code>insert</code> と車両の
+        <code>shaken_expiry_date</code> 更新を1トランザクションで行う必要があり、
+        通常の <code>createRecordFn</code> ではなく <code>complete_shaken</code> RPC
+        を通します（<code>features/shaken/server/complete-shaken.ts</code>）。
+        <code>record-form.tsx</code> がこの関数で分岐し、日付欄のラベルを
+        「実施日」から「車検日」に変え、有効期間と新しい満了日の入力欄を出します。
+      </p>
+      <p>
+        <code>type === 'shaken'</code> をその場に書かずに関数化しているのは、
+        呼び出し側の意図（「車検という特別扱いが必要な区分か」）を名前で示すためと、
+        将来この条件が変わったときの変更点を1か所に閉じ込めるためです。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-06 ／ 対象ファイル: src/features/maintenance/lib/work-types.ts
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/maintenance/lib/work-types.ts
   </footer>
 
 </div>

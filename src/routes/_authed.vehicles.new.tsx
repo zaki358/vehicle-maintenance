@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
+import { PageHeader } from '@/components/page-header'
 import { createVehicleFn } from '@/features/vehicles/server/create'
 import { VehicleForm } from '@/features/vehicles/vehicle-form'
 import type { VehicleFormResult } from '@/features/vehicles/vehicle-form'
@@ -23,9 +24,15 @@ function NewVehiclePage() {
   }
 
   return (
-    <main>
-      <h1>車両を登録</h1>
-      <VehicleForm submitLabel="登録" onSubmit={handleSubmit} />
-    </main>
+    <>
+      <PageHeader title="車両を登録" />
+      <main className="section section-compact">
+        <div className="container container-narrow">
+          <div className="card">
+            <VehicleForm submitLabel="登録" onSubmit={handleSubmit} />
+          </div>
+        </div>
+      </main>
+    </>
   )
 }

@@ -31,9 +31,11 @@ export async function updateRecordHandler(
     .update({
       performed_on: input.record.performedOn,
       work_type: input.record.workType,
-      work_type_other: input.record.workTypeOther,
+      detail: input.record.detail,
       odometer_km: input.record.odometerKm,
       part_detail: input.record.partDetail,
+      oil_type: input.record.oilType,
+      element_changed: input.record.elementChanged,
       note: input.record.note,
     })
     .eq('id', input.id)

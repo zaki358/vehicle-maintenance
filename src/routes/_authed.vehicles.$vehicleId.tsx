@@ -29,12 +29,16 @@ export const Route = createFileRoute('/_authed/vehicles/$vehicleId')({
 
 function VehicleNotFound() {
   return (
-    <main>
-      <h1>車両が見つかりません</h1>
-      <p>指定された車両は存在しないか、閲覧できません。</p>
-      <p>
-        <Link to="/vehicles">車両一覧へ戻る</Link>
-      </p>
+    <main className="section section-compact">
+      <div className="container container-narrow">
+        <div className="empty-state">
+          <h1>車両が見つかりません</h1>
+          <p>指定された車両は存在しないか、閲覧できません。</p>
+          <Link to="/vehicles" className="btn btn-secondary">
+            車両一覧へ戻る
+          </Link>
+        </div>
+      </div>
     </main>
   )
 }

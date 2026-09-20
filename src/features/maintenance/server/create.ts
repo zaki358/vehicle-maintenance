@@ -37,9 +37,11 @@ export async function createRecordHandler(
       vehicle_id: input.vehicleId,
       performed_on: input.record.performedOn,
       work_type: input.record.workType,
-      work_type_other: input.record.workTypeOther,
+      detail: input.record.detail,
       odometer_km: input.record.odometerKm,
       part_detail: input.record.partDetail,
+      oil_type: input.record.oilType,
+      element_changed: input.record.elementChanged,
       note: input.record.note,
     })
     .select()

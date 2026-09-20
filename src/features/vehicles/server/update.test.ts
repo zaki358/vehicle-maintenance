@@ -12,7 +12,7 @@ describe('updateVehicleHandler', () => {
     const from = vi.fn().mockReturnValue({ update })
 
     const result = await updateVehicleHandler(
-      { id: 'v1', name: '愛車2', vehicleType: 'motorcycle', shakenExpiryDate: null, note: 'メモ' },
+      { id: 'v1', name: '愛車2', modelCode: 'ZC33S', vehicleType: 'motorcycle', shakenExpiryDate: null, note: 'メモ' },
       { supabase: { from } },
     )
 
@@ -20,6 +20,7 @@ describe('updateVehicleHandler', () => {
     expect(from).toHaveBeenCalledWith('vehicles')
     expect(update).toHaveBeenCalledWith({
       name: '愛車2',
+      model_code: 'ZC33S',
       vehicle_type: 'motorcycle',
       shaken_expiry_date: null,
       note: 'メモ',
@@ -35,7 +36,7 @@ describe('updateVehicleHandler', () => {
     const from = vi.fn().mockReturnValue({ update })
 
     const result = await updateVehicleHandler(
-      { id: 'missing', name: '愛車2', vehicleType: 'car', shakenExpiryDate: null, note: '' },
+      { id: 'missing', name: '愛車2', modelCode: '', vehicleType: 'car', shakenExpiryDate: null, note: '' },
       { supabase: { from } },
     )
 
@@ -51,7 +52,7 @@ describe('updateVehicleHandler', () => {
 
     await expect(
       updateVehicleHandler(
-        { id: 'v1', name: '愛車2', vehicleType: 'car', shakenExpiryDate: null, note: '' },
+        { id: 'v1', name: '愛車2', modelCode: '', vehicleType: 'car', shakenExpiryDate: null, note: '' },
         { supabase: { from } },
       ),
     ).rejects.toThrow('boom')

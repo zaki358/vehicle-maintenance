@@ -32,7 +32,7 @@ test.describe('ログイン', () => {
     await loginViaUi(page, user.email, user.password)
 
     await expect(page).toHaveURL('/')
-    await expect(page.getByRole('heading', { name: '車両メンテナンス記録' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ダッシュボード' })).toBeVisible()
     await expect(page.getByText(`ログイン中: ${user.email}`)).toBeVisible()
   })
 })

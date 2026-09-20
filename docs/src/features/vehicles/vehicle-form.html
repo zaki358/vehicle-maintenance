@@ -17,18 +17,14 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      車両の新規登録（<code>routes/_authed.vehicles.new.tsx</code>）と編集
-      （<code>routes/_authed.vehicles.$vehicleId.edit.tsx</code>）の両方で共用する
-      フォームコンポーネントです。React・ルーティング・Supabase に依存するため
-      <code>lib/</code> 配下ではなく <code>features/vehicles/</code> 直下に置いています
-      （<code>eslint.config.js</code> の境界ルールにより <code>lib/</code> は
-      React import を禁止されている）。
+      車両の新規登録と編集で共用するフォームコンポーネントです。
+      車種名・型式・車両区分・車検満了日・備考の5項目を入力し、
+      <code>vehicleSchema</code> で検証してから props の <code>onSubmit</code> に渡します。
+      通信・保存は自分では行わないため、ルート側からも単体テストからも同じ形で使えます。
     </p>
     <p>
-      2つのページで見た目と検証ロジックが完全に同じフォームを別々に実装すると
-      片方だけ直し忘れる事故が起きやすいため、1つのコンポーネントに切り出しました。
-      新規登録では <code>initialValues</code> を渡さず全項目を空欄から始め、
-      編集では現在の値を渡します。
+      今回の変更で<strong>型式（<code>modelCode</code>）の入力欄が追加</strong>されました。
+      車種名だけでは同名の別グレードを区別しづらいため、補足として任意入力できます。
     </p>
   </section>
 
@@ -39,8 +35,10 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>VehicleFormResult</code></td><td>type（export）</td><td><code>onSubmit</code> が返す結果の型</td></tr>
-        <tr><td><code>VehicleForm</code></td><td>function（export・コンポーネント）</td><td>車両の登録・編集フォーム本体</td></tr>
+        <tr><td><code>VEHICLE_TYPES</code></td><td>const（非export）</td><td>選択肢に並べる車両区分の配列</td></tr>
+        <tr><td><code>VehicleFormResult</code></td><td>type（export）</td><td>送信結果。成功か、エラーメッセージ付きの失敗</td></tr>
+        <tr><td><code>VehicleFormProps</code></td><td>interface（非export）</td><td>props 定義</td></tr>
+        <tr><td><code>VehicleForm</code></td><td>component（export）</td><td>本体</td></tr>
       </tbody>
     </table>
   </section>
@@ -49,34 +47,50 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>interface VehicleFormProps {
+      <pre><code>const VEHICLE_TYPES: VehicleType[] = ['car', 'motorcycle']
+
+export type VehicleFormResult = { success: true } | { success: false; error: string }
+
+interface VehicleFormProps {
+  /** 編集時に渡す。未指定なら新規登録フォームとして空欄から始まる。 */
   initialValues?: VehicleInput
   submitLabel: string
-  onSubmit: (input: VehicleInput) => Promise&lt;VehicleFormResult&gt;
+  onSubmit: (input: VehicleInput) =&gt; Promise&lt;VehicleFormResult&gt;
 }</code></pre>
       <p>
-        フォーム自身は「検証済みの入力を <code>onSubmit</code> に渡す」ところまでが
-        責務で、実際にサーバー関数（<code>createVehicleFn</code> / <code>updateVehicleFn</code>）
-        を呼ぶのは呼び出し元のルートファイルです。これにより、このコンポーネントは
-        「新規登録なのか編集なのか」を一切知らずに済みます。
+        <code>initialValues</code> の有無だけで登録フォームと編集フォームを
+        切り替えます。ボタンの文言は <code>submitLabel</code> で外から与えるため、
+        コンポーネント側は「登録か編集か」を知る必要がありません。
+      </p>
+      <p>
+        <code>VehicleFormResult</code> は判別可能なユニオンです。例外を投げる代わりに
+        値として失敗を返させることで、呼び出し側が必ず結果を見ることになり、
+        エラーの握り潰しが起きにくくなります。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>const [shakenExpiryDate, setShakenExpiryDate] = useState(initialValues?.shakenExpiryDate ?? '')</code></pre>
+      <pre><code>const [name, setName] = useState(initialValues?.name ?? '')
+const [modelCode, setModelCode] = useState(initialValues?.modelCode ?? '')
+const [vehicleType, setVehicleType] = useState&lt;VehicleType&gt;(initialValues?.vehicleType ?? 'car')
+const [shakenExpiryDate, setShakenExpiryDate] = useState(initialValues?.shakenExpiryDate ?? '')
+const [note, setNote] = useState(initialValues?.note ?? '')</code></pre>
       <p>
-        車検満了日は「250cc以下のバイクなど、そもそも車検制度の対象外」という
-        車両があるため任意入力です。<code>&lt;input type="date"&gt;</code> は
-        未入力だと空文字列を返しますが、<code>vehicleSchema</code> の
-        <code>shakenExpiryDate</code> は「実在する日付文字列 or <code>null</code>」しか
-        受け付けません（空文字列は弾かれる）。この状態変数はUI都合の
-        <code>string</code> のまま持ち、送信時に変換します。
+        各欄を制御コンポーネントとして <code>useState</code> で保持します。
+        <code>modelCode</code> が今回追加された状態です。
+      </p>
+      <p>
+        <code>shakenExpiryDate</code> の初期値が <code>?? ''</code> になっているのは、
+        <code>&lt;input type="date"&gt;</code> の <code>value</code> が文字列しか受け取れず、
+        <code>null</code> を渡すと React が非制御コンポーネントとして扱ってしまうためです。
+        車検満了日を持たない車両（<code>null</code>）は空文字として表示します。
       </p>
     </div>
 
     <div class="doc-chunk">
       <pre><code>const parsed = vehicleSchema.safeParse({
   name,
+  modelCode,
   vehicleType,
   shakenExpiryDate: shakenExpiryDate === '' ? null : shakenExpiryDate,
   note,
@@ -86,31 +100,90 @@ if (!parsed.success) {
   return
 }</code></pre>
       <p>
-        送信時に空文字列を <code>null</code> へ変換してから、<code>vehicle-schema.ts</code>
-        と全く同じ <code>vehicleSchema</code> でクライアント側の検証をします。
-        <code>login.tsx</code> と同じパターンで、最初のエラーメッセージ1件だけを
-        画面に表示するシンプルな方式です（このクライアント側検証はUXのためであり、
-        実際のセキュリティ境界はサーバー関数側の同じスキーマによる再検証です）。
+        <strong>空文字から <code>null</code> への変換</strong>がこの関数の要点です。
+        <code>&lt;input type="date"&gt;</code> は未入力だと空文字列を返しますが、
+        <code>vehicleSchema</code> の <code>shakenExpiryDate</code> は
+        「実在する日付文字列 または <code>null</code>」しか受け付けず、空文字は弾かれます。
+        送信時にこの変換を挟むことで、250cc 以下のバイクなど車検満了日を持たない
+        車両が自然に扱えます。
+      </p>
+      <p>
+        <code>modelCode</code> には同様の変換がありません。型式は
+        <code>.default('')</code> の任意テキストで、未入力＝空文字がそのまま正しい値
+        だからです。「未入力」の表現を <code>null</code> と空文字に二分させない、
+        という DB 側と揃えた方針です。
+      </p>
+      <p>
+        <code>safeParse</code> で例外を投げずに最初のエラーメッセージを表示します。
+        なお本当の検証はサーバー関数の入口で同じスキーマにより行われるため、
+        ここでの検証はあくまで利用者への即時フィードバックです。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>const result = await onSubmit(parsed.data)
-if (!result.success) {
-  setError(result.error)
-}</code></pre>
+      <pre><code>&lt;div className="field"&gt;
+  &lt;label className="field-control"&gt;
+    &lt;span className="field-label"&gt;型式&lt;/span&gt;
+    &lt;input className="field-input" value={modelCode} onChange={...} /&gt;
+  &lt;/label&gt;
+  &lt;span className="field-hint"&gt;任意。例: ZC33S&lt;/span&gt;
+&lt;/div&gt;</code></pre>
       <p>
-        検証を通った入力（<code>DateString | null</code> に変換済みの
-        <code>VehicleInput</code>）を <code>onSubmit</code> に渡します。呼び出し元が
-        サーバー関数の呼び出しに失敗した場合は <code>{ success: false, error }</code>
-        を返す約束にしており、その場合はフォーム側でエラーメッセージを表示します。
+        追加された型式の入力欄です。ヒント（<code>field-hint</code>）が
+        <code>&lt;label&gt;</code> の外に置かれているのは、ラベルのクリック領域に
+        補足文まで含めないためです。ヒントを出すために
+        <code>&lt;div className="field"&gt;</code> でくるみ、<code>&lt;label&gt;</code> を
+        <code>field-control</code> に縮めるという構成は、車検満了日や走行距離など
+        他のヒント付きの欄でも共通です。
+      </p>
+      <p>
+        「任意。例: ZC33S」と具体例を添えているのは、「型式」が何を指すのかが
+        利用者によって解釈の分かれる語だからです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;select value={vehicleType} onChange={(event) =&gt; setVehicleType(event.target.value as VehicleType)}&gt;
+  {VEHICLE_TYPES.map((type) =&gt; (
+    &lt;option key={type} value={type}&gt;{vehicleTypeLabel(type)}&lt;/option&gt;
+  ))}
+&lt;/select&gt;</code></pre>
+      <p>
+        <code>option</code> の <code>value</code> は DB に保存する識別子
+        （<code>car</code> / <code>motorcycle</code>）、表示は
+        <code>vehicleTypeLabel()</code> が返す日本語、という分離です。
+        <code>as VehicleType</code> のキャストは、<code>select</code> の
+        <code>value</code> が DOM 上は <code>string</code> 型になるための橋渡しで、
+        実際に不正な値が来ても <code>vehicleSchema</code> の
+        <code>z.enum</code> が送信時に弾きます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>&lt;span className="field-hint"&gt;任意。250cc以下のバイクなど車検が無い車両は空欄&lt;/span&gt;
+...
+{error &amp;&amp; (
+  &lt;p role="alert" className="alert"&gt;{error}&lt;/p&gt;
+)}
+&lt;button type="submit" className="btn btn-primary" disabled={submitting}&gt;
+  {submitLabel}
+&lt;/button&gt;</code></pre>
+      <p>
+        車検満了日のヒントは「空欄でよい」ことを明示します。必須に見えて
+        入力に困る、という迷いを消すためです。
+      </p>
+      <p>
+        エラーは <code>role="alert"</code> で、スクリーンリーダーに即座に
+        読み上げられます。送信中は <code>disabled={submitting}</code> で
+        二重送信を防ぎ、<code>finally</code> で必ず解除するため、失敗しても
+        ボタンが押せないまま固まることはありません。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/features/vehicles/vehicle-form.tsx
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/vehicles/vehicle-form.tsx
   </footer>
 
 </div>

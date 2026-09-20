@@ -1,0 +1,125 @@
+/*
+ * 白いユーティリティカード（design.md の store-utility-card）。
+ * 影は付けない — 立体感は背景色の切り替えで出す。
+ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-tagline-size);
+  font-weight: 600;
+  line-height: var(--leading-tagline);
+}
+
+.card-title a {
+  color: var(--ink);
+}
+
+/* 「型式・区分」など、見出しの下に並べる小さな属性 */
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  font-size: var(--text-caption-size);
+  line-height: var(--leading-caption);
+  letter-spacing: var(--tracking-caption);
+  color: var(--ink-muted-80);
+}
+
+.card-meta-label {
+  color: var(--ink-muted-48);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: auto;
+  padding-top: var(--space-sm);
+}
+
+/* 車検アラート。色を足さず、段階を面の明暗で表す */
+.card-alert {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption-size);
+  line-height: var(--leading-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.card-alert-warning {
+  border: 1px solid var(--hairline);
+  background: var(--canvas-parchment);
+  color: var(--ink-muted-80);
+}
+
+.card-alert-danger {
+  background: var(--surface-tile-1);
+  color: var(--body-on-dark);
+}
+
+.card-alert-danger a {
+  color: var(--color-primary-on-dark);
+}
+
+/* 何も無いときの案内 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xxl) var(--space-lg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  text-align: center;
+  color: var(--ink-muted-80);
+}
+
+/* ログイン等、1枚だけ中央に置くカード */
+.card-centered {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  gap: var(--space-lg);
+}
+
+/* 記録の一覧行 */
+.list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.list-row-primary {
+  font-weight: 600;
+}
+
+.list-row-meta {
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+  color: var(--ink-muted-80);
+}
+
+/* 行の操作ボタンは右端に寄せる（縦積みのカードでは .card-actions が上詰めになる） */
+.list-row .card-actions {
+  margin-left: auto;
+  padding-top: 0;
+}

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>styles.css</title>
+<link rel="stylesheet" href="../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>styles.css</h1>
+    <div class="doc-path">src/styles.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      アプリ全体のスタイルの<strong>入口</strong>です。実際のルールはここには
+      1行も書かず、<code>src/styles/</code> 以下に分割した7つのファイルを
+      <code>@import</code> で並べるだけのファイルになっています。
+    </p>
+    <p>
+      ルートルート（<code>src/routes/__root.tsx</code>）がこのファイル1つだけを
+      読み込むため、スタイルを追加したいときは <code>styles/</code> に新しい
+      ファイルを作ってここに1行足すだけで済みます。逆に言えば、
+      <strong>読み込み順という重要な情報がこの1ファイルに集約</strong>されており、
+      それがこのファイルの存在意義です。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>tokens.css</code></td><td>@import（1番目）</td><td>design.md のトークンを CSS 変数として定義</td></tr>
+        <tr><td><code>base.css</code></td><td>@import（2番目）</td><td>リセットと地の文のタイポグラフィ</td></tr>
+        <tr><td><code>layout.css</code></td><td>@import（3番目）</td><td>タイル・コンテナ・グリッドなどの骨格</td></tr>
+        <tr><td><code>nav.css</code></td><td>@import（4番目）</td><td>2段ナビ</td></tr>
+        <tr><td><code>buttons.css</code></td><td>@import（5番目）</td><td>ボタンの3文法</td></tr>
+        <tr><td><code>forms.css</code></td><td>@import（6番目）</td><td>入力フォーム</td></tr>
+        <tr><td><code>cards.css</code></td><td>@import（7番目）</td><td>カード・アラート・一覧行</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>/*
+ * アプリ全体のスタイルの入口。実体は styles/ 以下に分割してある。
+ * 読み込み順に意味がある: トークン → 地の文 → 部品。
+ */</code></pre>
+      <p>
+        分割の方針は CLAUDE.md の「小さいファイルを多数」に沿ったものです。
+        以前は 1枚の <code>styles.css</code> にすべてが入っていましたが、
+        役割ごとに切り出すことで「ボタンの見た目を直したい」ときに
+        開くべきファイルが自明になります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/layout.css';</code></pre>
+      <p>
+        <strong>順番に意味があります。</strong>まず <code>tokens.css</code> が
+        <code>:root</code> に変数を定義し、以降のファイルがそれを参照します。
+        （CSS カスタムプロパティ自体は宣言順に依存しませんが、
+        「トークンが土台である」という依存関係を並び順で表現しています。）
+      </p>
+      <p>
+        次に <code>base.css</code> が素の HTML 要素（<code>body</code>、
+        <code>h1</code>、<code>a</code> など）のスタイルを決め、
+        その上に <code>layout.css</code> 以降のクラスが乗ります。
+        <strong>要素セレクタより後にクラスセレクタを置く</strong>ことで、
+        詳細度が同じ場合でも後勝ちで上書きでき、
+        <code>!important</code> を使わずに済みます。
+      </p>
+      <p>
+        実際、<code>buttons.css</code> の <code>.btn:hover</code> は
+        <code>base.css</code> の <code>a:hover</code> の下線を打ち消していますし、
+        <code>forms.css</code> の入力欄フォーカスは <code>base.css</code> の
+        <code>:focus-visible</code> を上書きしています。どちらも
+        この読み込み順が前提です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>@import './styles/nav.css';
+@import './styles/buttons.css';
+@import './styles/forms.css';
+@import './styles/cards.css';</code></pre>
+      <p>
+        後半は部品（コンポーネント）のスタイルです。この中でも
+        <code>buttons.css</code> を <code>nav.css</code> より後に置いているのは、
+        <code>.nav .btn-utility</code> という<strong>ナビ文脈での上書き</strong>が
+        <code>buttons.css</code> 側に書かれているためです。
+        同様に <code>cards.css</code> の <code>.list-row .card-actions</code> も
+        最後に読み込まれることで確実に効きます。
+      </p>
+      <p>
+        なお <code>@import</code> は Vite のビルド時に解決され、
+        本番では1つの CSS ファイルにまとめられます。ブラウザが
+        <code>@import</code> を逐次解決するときの読み込み遅延
+        （ウォーターフォール）は発生しません。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles.css
+  </footer>
+
+</div>
+</body>
+</html>

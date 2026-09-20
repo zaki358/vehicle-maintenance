@@ -28,6 +28,7 @@ export async function updateVehicleHandler(
     .from('vehicles')
     .update({
       name: input.name,
+      model_code: input.modelCode,
       vehicle_type: input.vehicleType,
       shaken_expiry_date: input.shakenExpiryDate,
       note: input.note,

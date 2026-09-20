@@ -79,39 +79,55 @@ function SetPasswordPage() {
   }
 
   return (
-    <main>
-      <h1>パスワードの設定</h1>
-      {status === 'checking' && <p>リンクを確認しています…</p>}
-      {status === 'ready' && (
-        <form onSubmit={handleSubmit}>
-          <label>
-            新しいパスワード
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-          </label>
-          <label>
-            新しいパスワード（確認）
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-          </label>
-          <button type="submit" disabled={submitting}>
-            設定する
-          </button>
-        </form>
-      )}
-      {error && <p role="alert">{error}</p>}
+    <main className="page">
+      <section className="section section-compact">
+        <div className="card card-centered">
+          <div className="stack-tight">
+            <h1>パスワードの設定</h1>
+            <p className="field-hint">車両メンテナンス記録</p>
+          </div>
+          {status === 'checking' && <p className="field-hint">リンクを確認しています…</p>}
+          {status === 'ready' && (
+            <form onSubmit={handleSubmit} className="form-stack">
+              <div className="field">
+                <label className="field-control">
+                  <span className="field-label">新しいパスワード</span>
+                  <input
+                    type="password"
+                    className="field-input"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </label>
+                <span className="field-hint">8文字以上</span>
+              </div>
+              <label className="field">
+                <span className="field-label">新しいパスワード（確認）</span>
+                <input
+                  type="password"
+                  className="field-input"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                設定する
+              </button>
+            </form>
+          )}
+          {error && (
+            <p role="alert" className="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </section>
     </main>
   )
 }

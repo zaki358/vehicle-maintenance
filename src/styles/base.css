@@ -1,0 +1,93 @@
+/*
+ * リセットと地の文のタイポグラフィ。
+ * 本文は 17px / 1.47 / -0.374px（design.md の Principles、16px にしない）。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas-parchment);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: var(--text-body-size);
+  font-weight: 400;
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--text-display-lg-size);
+  line-height: var(--leading-display-lg);
+  letter-spacing: var(--tracking-body);
+}
+
+h2 {
+  font-size: var(--text-display-md-size);
+  line-height: var(--leading-tagline);
+  letter-spacing: var(--tracking-body);
+}
+
+h3 {
+  font-size: var(--text-tagline-size);
+  line-height: var(--leading-tagline);
+}
+
+p {
+  margin: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* フォーカスリングは design.md の focus token に統一 */
+:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+/* 見出しは画面幅に応じて段階的に縮める（design.md の Hero typography） */
+@media (max-width: 640px) {
+  h1 {
+    font-size: var(--text-display-md-size);
+  }
+
+  h2 {
+    font-size: var(--text-lead-size);
+  }
+}
+
+@media (max-width: 419px) {
+  h1 {
+    font-size: var(--text-lead-size);
+  }
+}

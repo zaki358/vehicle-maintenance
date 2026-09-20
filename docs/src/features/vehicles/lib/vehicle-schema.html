@@ -17,17 +17,22 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      車両の登録・編集フォームから送られてくる入力を検証する Zod スキーマです。
-      「全書き込みはサーバー関数の入口で Zod 検証する」というプロジェクト方針
-      （<code>CLAUDE.md</code>）に沿って、車両まわりの入力検証をこの1ファイルに
-      集約しています。
+      車両の登録・編集フォームの入力を検証する Zod スキーマです。
+      フォーム（<code>vehicle-form.tsx</code>）の送信前チェックと、サーバー関数
+      （<code>server/create.ts</code> / <code>server/update.ts</code>）の入口検証の
+      両方が同じ定義を使います。サーバー関数は実 HTTP エンドポイントなので、
+      クライアント側の検証結果は信用しません。
     </p>
     <p>
-      使っている Zod は 4系で、<code>z.string().email()</code> のような書き方が
-      廃止されるなど記法が変わっているため、実際にインストールされているバージョンの
-      挙動をコードで確認しながら実装しています。日付の検証自体は
-      <code>src/lib/date/date-string-schema.ts</code> に切り出されており、
-      整備記録のスキーマ（<code>record-schema.ts</code>）とも共有しています。
+      整備記録の <code>recordSchema</code> と違って <code>superRefine</code> や
+      <code>transform</code> を持たない素の <code>z.object</code> です。そのため
+      <code>.shape</code> を持ち、<code>vehicleIdSchema.extend(vehicleSchema.shape)</code>
+      のように他のスキーマと平坦に合成できます。
+    </p>
+    <p>
+      今回の変更で <code>modelCode</code>（型式）が追加されました。
+      車種名だけでは同名の別グレードを区別できないため、一覧や詳細で
+      補足表示する目的の任意入力項目です。
     </p>
   </section>
 
@@ -38,8 +43,11 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>vehicleSchema</code></td><td>const（export）</td><td>車両フォーム入力を検証する Zod スキーマ</td></tr>
-        <tr><td><code>VehicleInput</code></td><td>type（export）</td><td><code>vehicleSchema</code> から推論した入力の型</td></tr>
+        <tr><td><code>NAME_MAX_LENGTH</code></td><td>const（非export）</td><td>車種名の最大文字数（50）</td></tr>
+        <tr><td><code>MODEL_CODE_MAX_LENGTH</code></td><td>const（非export）</td><td>型式の最大文字数（50）</td></tr>
+        <tr><td><code>NOTE_MAX_LENGTH</code></td><td>const（非export）</td><td>備考の最大文字数（1000）</td></tr>
+        <tr><td><code>vehicleSchema</code></td><td>Zod スキーマ（export）</td><td>車両入力の検証定義</td></tr>
+        <tr><td><code>VehicleInput</code></td><td>type（export）</td><td><code>z.infer</code> による入力型</td></tr>
       </tbody>
     </table>
   </section>
@@ -48,62 +56,101 @@
     <h2>コード解説</h2>
 
     <div class="doc-chunk">
-      <pre><code>export const vehicleSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, '車種名を入力してください')
-    .max(NAME_MAX_LENGTH, `車種名は${NAME_MAX_LENGTH}文字以内で入力してください`),
-  vehicleType: z.enum(['car', 'motorcycle'], { error: '車両区分を選択してください' }),
-  shakenExpiryDate: dateStringSchema.nullable(),
-  note: z
-    .string()
-    .trim()
-    .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
-    .default(''),
-})</code></pre>
+      <pre><code>const NAME_MAX_LENGTH = 50
+const MODEL_CODE_MAX_LENGTH = 50
+const NOTE_MAX_LENGTH = 1000</code></pre>
       <p>
-        4つのフィールドを検証します。
-      </p>
-      <p>
-        <strong><code>name</code></strong> — <code>.trim()</code> で前後の空白を
-        落としてから <code>.min(1)</code> で必須チェックするため、
-        空白だけの入力（<code>"   "</code>）も未入力として弾かれます。
-        上限は50文字。
-      </p>
-      <p>
-        <strong><code>vehicleType</code></strong> — <code>'car'</code> /
-        <code>'motorcycle'</code> の2値のみ許可する列挙。<code>vehicle-type.ts</code>
-        の <code>VehicleType</code> 型と対応しています。
-      </p>
-      <p>
-        <strong><code>shakenExpiryDate</code></strong> — <code>src/lib/date/date-string-schema.ts</code>
-        の共有スキーマを <code>.nullable()</code> でラップしています。
-        <code>null</code> は「250cc以下のバイクなど車検制度の対象外」を表す
-        正常値であり、エラーにはしません（判定は
-        <code>shaken-required.ts</code> の役割）。
-      </p>
-      <p>
-        <strong><code>note</code></strong> — 備考欄。<code>.default('')</code>
-        により、フォームで備考が未入力（<code>undefined</code>）でも常に文字列
-        <code>''</code> として扱われ、以降のコードで <code>null</code> や
-        <code>undefined</code> の分岐を書かずに済みます。上限は1000文字。
+        上限値を定数化し、エラーメッセージにも同じ定数を埋め込んでいます。
+        DB 側の <code>vehicles</code> テーブルはこれらを <code>text</code> で持ち、
+        文字数の上限を持ちません。長さの上限はアプリの入力ポリシー、構造は DB、
+        という役割分担です（マイグレーション
+        <code>20260920110000_add_vehicle_model_code.sql</code> のコメントにも
+        同じ方針が書かれています）。
       </p>
     </div>
 
     <div class="doc-chunk">
-      <pre><code>export type VehicleInput = z.infer&lt;typeof vehicleSchema&gt;</code></pre>
+      <pre><code>name: z
+  .string()
+  .trim()
+  .min(1, '車種名を入力してください')
+  .max(NAME_MAX_LENGTH, `車種名は${NAME_MAX_LENGTH}文字以内で入力してください`),</code></pre>
       <p>
-        スキーマから型を逆算しています。フィールドの型定義をスキーマとTypeScriptの
-        型定義の2箇所に書くと将来どちらかが更新漏れでズレるため、
-        スキーマを唯一の情報源（single source of truth）にしています。
+        車種名は唯一の必須テキストです。<code>trim()</code> を
+        <code>min(1)</code> より先に通しているため、空白だけの入力も
+        「未入力」として弾かれます（順序が逆だと空白1文字が通ってしまいます）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>modelCode: z
+  .string()
+  .trim()
+  .max(MODEL_CODE_MAX_LENGTH, `型式は${MODEL_CODE_MAX_LENGTH}文字以内で入力してください`)
+  .default(''),</code></pre>
+      <p>
+        <strong>今回追加された型式の欄</strong>です。<code>min</code> を置かず
+        <code>.default('')</code> にしているため、未入力は空文字として通ります。
+      </p>
+      <p>
+        「未入力」を <code>null</code> ではなく空文字に統一しているのが要点です。
+        DB 側も <code>model_code text not null default ''</code> で定義されており、
+        <code>null</code> と空文字という2種類の「未入力」が生まれないようにしています。
+        <code>note</code> や <code>part_detail</code> など既存の任意テキスト列と同じ方針です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>vehicleType: z.enum(['car', 'motorcycle'], { error: '車両区分を選択してください' }),</code></pre>
+      <p>
+        車両区分は車（<code>car</code>）とバイク（<code>motorcycle</code>）の2値です。
+        <code>z.enum</code> なので、フォームの <code>select</code> を迂回して
+        別の値を送っても入口で弾かれます。表示用の日本語ラベルは
+        <code>vehicle-type.ts</code> の <code>vehicleTypeLabel()</code> が持ちます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>shakenExpiryDate: dateStringSchema.nullable(),</code></pre>
+      <p>
+        <code>null</code> は<strong>エラーではなく正常値</strong>です。
+        250cc 以下のバイクなど車検制度の対象外の車両を表します
+        （判定の詳細は <code>shaken-required.ts</code>）。
+        <code>.default()</code> を付けていないため、キー自体の省略は許しません。
+        呼び出し側が「入れ忘れた」のか「意図的に無し」なのかを区別できるようにする
+        ためで、フォーム側は空文字を明示的に <code>null</code> へ変換して渡します。
+      </p>
+      <p>
+        日付は <code>dateStringSchema</code> により branded な <code>DateString</code>
+        として扱われ、<code>Date</code> には変換しません。Cloudflare Workers は
+        常に <code>TZ=UTC</code> で動くため、利用者の JST とのずれが日付を1日
+        前後させる危険があるからです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>note: z
+  .string()
+  .trim()
+  .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
+  .default(''),
+
+export type VehicleInput = z.infer&lt;typeof vehicleSchema&gt;</code></pre>
+      <p>
+        備考も <code>modelCode</code> と同じく任意・空文字既定です。
+      </p>
+      <p>
+        <code>VehicleInput</code> はフォームの <code>initialValues</code>、
+        サーバー関数の引数、テストのフィクスチャで共通に使われます。
+        スキーマに項目を足せば型も自動的に追従するため、<code>modelCode</code> の
+        追加時も型定義を別途書き足す必要はありませんでした。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-06 ／ 対象ファイル: src/features/vehicles/lib/vehicle-schema.ts
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/vehicles/lib/vehicle-schema.ts
   </footer>
 
 </div>

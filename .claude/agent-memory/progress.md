@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(招待/再設定リンクからのパスワード設定の不具合を修正。開発環境で実ログイン成功)
+最終更新: 2026-09-20(UI刷新 Phase A〜F。デザインシステム導入・作業区分9種への作り替え・車検の統合)
 
 ---
 
@@ -446,6 +446,61 @@ Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正�
       （リンクを開いただけでは消費せず、画面のボタン押下で`verifyOtp`）に変えること。
       **カスタムSMTPの設定が前提**なので、依頼者と相談してから着手する
 
+### 2026-09-20（UI刷新: デザインシステム導入とデータモデル変更）
+
+依頼者から「レスポンシブ非対応・全ページ使いづらい」との指摘を受けた大規模改修。
+Apple のデザイン言語の分析結果を `docs/design.md` として受領し、これを唯一の基準にした。
+A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D（フォーム）→ E（調整）→ F（検証）の順で実施。
+
+- [x] **Phase A: マイグレーション2本**（依頼者がSQL Editorで開発用に適用済み。**本番は未適用**）
+      - `20260920110000_add_vehicle_model_code.sql` — 車両に `model_code`（型式・任意）
+      - `20260920110100_rework_maintenance_work_types.sql` — 既存記録を全削除し、
+        作業区分を9種へ入れ替え、`detail`/`oil_type`/`element_changed` を追加、`work_type_other` を削除。
+        区分ごとの必須（部品交換は交換内容＋部品型式、など）をCHECK制約でも保証
+      - 旧CHECK制約の削除は**制約名を決め打ちせず** `pg_constraint` を検索して drop する DO ブロックにした
+        （インライン CHECK の名前は Postgres の自動採番に依存するため）
+      - `database.types.ts` は**ダッシュボードのDocs画面からダウンロード**して差し替えた。
+        **UIが変わっており、旧手順（API Docsの TypeScript タブ）は消滅**。
+        現在は Data API → Docs → 「Generating types」の
+        **Generate and download types ボタン**で `.ts` ファイルが落ちてくる
+- [x] **Phase B: 純粋ロジック（TDD）**
+      - `work-types.ts` を全面刷新。`workTypeFields()` が「区分ごとにどの欄を出すか・必須か」を返し、
+        **フォームとスキーマの両方がこの1か所を読む**（画面と検証がずれない）。12テスト
+      - `record-schema.ts` を区分別バリデーションへ。検証後に `.transform()` で
+        その区分で使わない項目を空へ戻す（区分を切り替えた後の残骸をDBへ持ち込まない）。21テスト
+      - `vehicle-schema.ts` に `modelCode` を追加。4テスト追加
+- [x] **Phase C: デザインシステム**
+      - `src/styles/{tokens,base,layout,nav,buttons,forms,cards}.css` を新設し `src/styles.css` が @import する構成。
+        色・文字・余白・角丸は design.md の値をトークン化し、各ファイルに生の hex を書かない
+      - `src/components/{app-nav,page-header}.tsx` を新設。ログアウトは全ページ共通のナビへ移動
+      - **色を増やさない制約への対処**: 車検アラートの段階差を、赤などの色ではなく
+        面の明暗（警告＝淡いカード／危険・期限切れ＝黒いタイル）で表現した
+      - 反省: 「残りは Phase E でまとめて」と説明したまま先に進めたため、依頼者には
+        **ほとんどのページが直っていない（むしろ旧 `main` のCSSを消した分悪化した）状態**に見えていた。
+        指摘を受けて同セッション内で全ページに適用し直した。**部分適用の状態で止めない**こと
+- [x] **Phase D: フォームと車検の統合**
+      - `record-form.tsx` を作り直し。区分で入力欄が変わる。車検を選ぶと日付欄の見出しが「車検日」になり、
+        有効期間と新しい満了日が出て、送信は `complete_shaken` RPC 経由になる（記録追加と満了日更新を1トランザクション）
+      - **車検専用ページ `/vehicles/$id/shaken` と `complete-shaken-form.tsx` を削除**し、整備記録へ統合。
+        「車検完了を記録」リンクは `/records/new?workType=shaken` を指す（`validateSearch` + `.catch(undefined)`）
+      - 車検の入力項目は新仕様どおり車検日・走行距離・備考のみ。`completeShakenSchema` から `partDetail` を削除し、
+        RPC 呼び出しからも `p_part_detail` を外した（RPC 側は default '' なので引数を省略できる）
+- [x] **Phase E: 実データでの調整**（使い捨てユーザー＋車両2台・記録5件を投入して全画面を確認）
+      - 整備記録一覧の操作ボタンを行の右端へ（`.list-row .card-actions { margin-left: auto }`）
+      - 絞り込みセレクトが全幅に伸びるのを 320px で止める（`.field-compact`）
+      - ダッシュボードのログイン中メールを 28px から補足サイズへ（スマホで2行に折り返していた）
+      - 未来日付の記録で「前回整備 …（-5日前）」と出ていたのを、日数がマイナスなら出さないよう修正
+- [x] **Phase F: E2E更新と検証**
+      - `PageHeader` を `<h1>` に変更（サブナビのページ名が唯一の主見出し）。本文側は `<h2>` から始める。
+        それまで**見出し要素が無いページがあり**、E2Eのheading指定も失敗していた
+      - E2E 5ファイルを新UIに追随（リンク名「整備を記録」、ラベル「部品型式」、車検は `?workType=shaken`、
+        車両一覧の見出しは「車両」、ダッシュボードは「ダッシュボード」）
+      - `npm run test:e2e`: 26件成功・2件flaky（リトライで成功。Phase 8 から続くハイドレーション待ちの不安定さ）
+
+**未着手・持ち越し**
+- 本番Supabase（`wwvuxjvcwntqzdvyezss`）へのマイグレーション2本の適用と、本番へのデプロイ
+- 本番の Site URL は `https://vehicle-maintenance.y-kakeibo.workers.dev/set-password` に変更済み
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -590,7 +645,11 @@ Phase 8: 3エージェント並列レビュー→指摘のHIGH+Medium全修正�
 
 ## 次にやること
 
-**Phase 9 完了。全フェーズ完了。**
+**実装プランの全フェーズ完了後、2026-09-20 にUI刷新（Phase A〜F）を実施。**
+
+- **本番用Supabaseへマイグレーション2本を適用する**（開発用と同じSQL Editor手動貼り付け）
+- 適用後に `npm run deploy` で本番へデプロイする
+- 本番で招待 → パスワード設定 → ログインを通しで確認する（開発環境では成功済み）
 
 - `/set-password`の修正一式（`parse-auth-hash.ts`/`auth-errors.ts`/`set-password.tsx`＋docs）と
   `docs/index.html`をコミットするかどうか依頼者に確認する（いずれも未コミット）

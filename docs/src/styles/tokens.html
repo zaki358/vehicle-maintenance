@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tokens.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>tokens.css</h1>
+    <div class="doc-path">src/styles/tokens.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      デザイン仕様書 <code>docs/design.md</code> に書かれている色・タイポグラフィ・
+      余白・角丸・レイアウト寸法を、そのまま CSS カスタムプロパティ（変数）に
+      写し取ったファイルです。デザインシステムの<strong>単一の出所</strong>として、
+      他のスタイルファイルはここで定義した <code>var(--...)</code> だけを参照し、
+      生の hex カラーやマジックナンバーの px を書きません。
+    </p>
+    <p>
+      こうしておくと「この青は design.md のどの色か」を追跡でき、仕様が変わったときも
+      このファイル1枚を直せば全画面に反映されます。逆に、ここに無い色を使いたくなったら
+      それは design.md からの逸脱であり、まず仕様側を更新すべき、という判断基準にもなります。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>:root</code></td><td>セレクタ</td><td>全トークンを定義する唯一のブロック</td></tr>
+        <tr><td><code>--color-*</code></td><td>変数群</td><td>唯一のアクセント色（青）とその派生</td></tr>
+        <tr><td><code>--canvas / --surface-*</code></td><td>変数群</td><td>面の色。明るいタイルと暗いタイル</td></tr>
+        <tr><td><code>--ink / --body-*</code></td><td>変数群</td><td>文字色。明背景用・暗背景用</td></tr>
+        <tr><td><code>--divider-* / --hairline-*</code></td><td>変数群</td><td>極細の境界線</td></tr>
+        <tr><td><code>--font-* / --text-* / --leading-* / --tracking-*</code></td><td>変数群</td><td>書体とタイプスケール</td></tr>
+        <tr><td><code>--space-*</code></td><td>変数群</td><td>8px 基準の余白スケール</td></tr>
+        <tr><td><code>--radius-*</code></td><td>変数群</td><td>角丸</td></tr>
+        <tr><td><code>--shadow-product</code></td><td>変数</td><td>システム内で唯一許された影</td></tr>
+        <tr><td><code>--nav-height / --content-max / --touch-target</code></td><td>変数群</td><td>レイアウト寸法</td></tr>
+        <tr><td><code>@media (max-width: 735px)</code></td><td>メディアクエリ</td><td>狭い画面でセクション余白を縮める</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>:root {
+  /* Brand &amp; accent — 対話要素はこの1色だけ */
+  --color-primary: #0066cc;
+  --color-primary-focus: #0071e3;
+  --color-primary-on-dark: #2997ff;
+  --color-on-primary: #ffffff;</code></pre>
+      <p>
+        <strong>アクセント色は1つだけ</strong> — design.md は
+        「リンク・ピル型 CTA・フォーカスリングなど、すべての対話要素は
+        この青ひとつが担う。第2のブランドカラーは存在しない」と定めています。
+        そのため赤や緑といった「警告色」はここに存在しません。危険や注意は
+        色ではなく<strong>面の明暗</strong>（暗いタイル）で表現します
+        （<code>cards.css</code> の <code>.card-alert-danger</code> を参照）。
+      </p>
+      <p>
+        3つの青は用途が違います。<code>--color-primary</code> は通常の対話要素、
+        <code>--color-primary-focus</code> はフォーカスリング（わずかに明るく、
+        リングとして視認しやすい）、<code>--color-primary-on-dark</code> は
+        暗いタイルの上に置くリンク用です。暗背景で <code>#0066cc</code> を使うと
+        コントラストが足りないため、明るい青に差し替える必要があります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* Surface */
+  --canvas: #ffffff;
+  --canvas-parchment: #f5f5f7;
+  --surface-pearl: #fafafc;
+  --surface-tile-1: #272729;
+  --surface-tile-2: #2a2a2c;
+  --surface-tile-3: #252527;
+  --surface-black: #000000;
+  --surface-chip-translucent: rgba(210, 210, 215, 0.64);</code></pre>
+      <p>
+        面の色が階層を作ります。design.md はカードやボタンに影を付けることを
+        禁じており、「奥行き」は<strong>背景色の切り替わり</strong>と
+        <strong>固定バーの背景ぼかし</strong>だけで表現します。そのため白から
+        ほぼ黒まで、細かく刻んだ面色が必要になります。
+      </p>
+      <p>
+        <code>--surface-black</code>（真っ黒）はグローバルナビ専用で、
+        暗いコンテンツタイルの <code>--surface-tile-1</code>（#272729）とは
+        別物です。ナビだけが純黒になることで、ページ内容とナビが明確に分離します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* Text */
+  --ink: #1d1d1f;
+  --ink-muted-80: #333333;
+  --ink-muted-48: #7a7a7a;
+  --body-on-dark: #ffffff;
+  --body-muted: #cccccc;</code></pre>
+      <p>
+        本文色は純黒（#000000）ではなく <code>#1d1d1f</code> です。純黒の文字は
+        白背景上でコントラストが強すぎ、長文を読むと目が疲れるため、
+        わずかに灰を含んだ黒を使います。<code>--ink-muted-48</code> は
+        補足文・キャプション用で、これ以上薄い色はコントラスト比が
+        不足するため用意していません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* Type families — Apple 環境では system-ui が SF Pro に解決される */
+  --font-display: 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-text: 'SF Pro Text', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;</code></pre>
+      <p>
+        Web フォントを読み込まず、OS 標準のフォントに委ねています。Apple 製品では
+        <code>system-ui</code> が SF Pro に解決され、Windows では Segoe UI、
+        Android では Roboto になります。<strong>フォントファイルのダウンロードが
+        発生しない</strong>ので初回表示が速く、書体の差し替えによる
+        レイアウトのちらつき（FOUT）も起きません。
+      </p>
+      <p>
+        display と text の2系統に分けているのは、Apple のタイポグラフィが
+        見出し用（字間が詰まった SF Pro Display）と本文用（字面が広い SF Pro Text）を
+        使い分けるためです。<code>base.css</code> で <code>h1〜h3</code> に
+        display、<code>body</code> に text を割り当てています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  --text-body-size: 17px;
+  ...
+  --leading-body: 1.47;
+  --tracking-body: -0.374px;</code></pre>
+      <p>
+        本文は <strong>16px ではなく 17px</strong> です。これは Apple の
+        タイポグラフィの特徴で、design.md の Principles に明記されています。
+        サイズ・行送り（<code>line-height</code>）・字間（<code>letter-spacing</code>）は
+        必ず3点セットで使う決まりです。サイズだけ変えて行送りを据え置くと、
+        画面ごとに行間の印象がばらついてしまうためです。
+      </p>
+      <p>
+        字間が負の値（<code>-0.374px</code>）なのは、SF Pro が標準状態では
+        やや字間が広く見えるためで、わずかに詰めることで締まった見え方になります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* Spacing — 基準 8px */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 17px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 80px;</code></pre>
+      <p>
+        8px を基準にした階段です。<code>--space-md</code> だけ 16px ではなく
+        <strong>17px</strong> なのは、本文サイズ（17px）と揃えて「1行分の余白」を
+        作るためで、design.md の値をそのまま写しています。
+        <code>--space-section</code>（80px）はタイルの上下パディングで、
+        1タイルがほぼ1画面を占める低密度なレイアウトを支えています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* 唯一の影。製品写真のためのもので、カード・ボタン・文字には使わない */
+  --shadow-product: rgba(0, 0, 0, 0.22) 3px 5px 30px 0;</code></pre>
+      <p>
+        design.md の Shadow philosophy では、システム全体で影は
+        <strong>ちょうど1つ</strong>しか存在せず、それは製品写真が面の上に
+        乗っている重みを表すためのもの、と定められています。カード・ボタン・
+        文字に影を付けるのは明確な禁止事項です。このアプリには製品写真が
+        無いため実際には未使用ですが、「影はこれ以外に足さない」という
+        制約を可視化するためにトークンとして残しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  /* Layout */
+  --nav-height: 44px;
+  --sub-nav-height: 52px;
+  --content-max: 1440px;
+  --content-max-reading: 980px;
+  --touch-target: 44px;</code></pre>
+      <p>
+        <code>--nav-height</code> は <code>nav.css</code> のナビ高さであると同時に、
+        サブナビの <code>position: sticky; top: var(--nav-height)</code> にも
+        使われます。両方が同じ変数を見ているので、ナビの高さを変えても
+        サブナビが重なったり隙間が空いたりしません。
+      </p>
+      <p>
+        <code>--touch-target</code>（44px）は Apple のヒューマンインターフェイス
+        ガイドラインが定める最小タップ領域です。ボタン（<code>buttons.css</code>）と
+        入力欄・チェックボックス行（<code>forms.css</code>）がこの値を
+        <code>min-height</code> に使い、指で押せる大きさを保証しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* タイル内の縦余白は小さい画面で詰める（design.md の Collapsing Strategy） */
+@media (max-width: 735px) {
+  :root {
+    --space-section: 48px;
+  }
+}</code></pre>
+      <p>
+        レスポンシブ対応を<strong>トークン側で</strong>行っている点がポイントです。
+        個々のコンポーネントにメディアクエリを書くのではなく、変数の値を
+        差し替えるだけで、<code>--space-section</code> を使っているすべての
+        場所（<code>.section</code> の上下パディング）が一斉に縮みます。
+        スマートフォンで 80px の余白はスクロール量が増えすぎるため、
+        48px まで詰めています。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/tokens.css
+  </footer>
+
+</div>
+</body>
+</html>

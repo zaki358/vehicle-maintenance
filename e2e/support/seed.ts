@@ -51,9 +51,11 @@ export interface SeedRecordInput {
   vehicleId: string
   performedOn: string
   workType: string
-  workTypeOther?: string
+  detail?: string
   odometerKm?: number | null
   partDetail?: string
+  oilType?: string
+  elementChanged?: boolean
   note?: string
 }
 
@@ -67,9 +69,11 @@ export async function seedRecord(
       vehicle_id: input.vehicleId,
       performed_on: input.performedOn,
       work_type: input.workType,
-      work_type_other: input.workTypeOther ?? '',
+      detail: input.detail ?? '',
       odometer_km: input.odometerKm ?? null,
       part_detail: input.partDetail ?? '',
+      oil_type: input.oilType ?? '',
+      element_changed: input.elementChanged ?? false,
       note: input.note ?? '',
     })
     .select()

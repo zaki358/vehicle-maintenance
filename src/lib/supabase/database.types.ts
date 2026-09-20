@@ -12,47 +12,78 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       maintenance_records: {
         Row: {
           created_at: string
+          detail: string
+          element_changed: boolean
           id: string
           note: string
           odometer_km: number | null
+          oil_type: string
           part_detail: string
           performed_on: string
           updated_at: string
           user_id: string
           vehicle_id: string
           work_type: string
-          work_type_other: string
         }
         Insert: {
           created_at?: string
+          detail?: string
+          element_changed?: boolean
           id?: string
           note?: string
           odometer_km?: number | null
+          oil_type?: string
           part_detail?: string
           performed_on: string
           updated_at?: string
           user_id?: string
           vehicle_id: string
           work_type: string
-          work_type_other?: string
         }
         Update: {
           created_at?: string
+          detail?: string
+          element_changed?: boolean
           id?: string
           note?: string
           odometer_km?: number | null
+          oil_type?: string
           part_detail?: string
           performed_on?: string
           updated_at?: string
           user_id?: string
           vehicle_id?: string
           work_type?: string
-          work_type_other?: string
         }
         Relationships: [
           {
@@ -69,6 +100,7 @@ export type Database = {
           archived_at: string | null
           created_at: string
           id: string
+          model_code: string
           name: string
           note: string
           shaken_expiry_date: string | null
@@ -80,6 +112,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           id?: string
+          model_code?: string
           name: string
           note?: string
           shaken_expiry_date?: string | null
@@ -91,6 +124,7 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           id?: string
+          model_code?: string
           name?: string
           note?: string
           shaken_expiry_date?: string | null
@@ -116,16 +150,18 @@ export type Database = {
         }
         Returns: {
           created_at: string
+          detail: string
+          element_changed: boolean
           id: string
           note: string
           odometer_km: number | null
+          oil_type: string
           part_detail: string
           performed_on: string
           updated_at: string
           user_id: string
           vehicle_id: string
           work_type: string
-          work_type_other: string
         }
         SetofOptions: {
           from: "*"
@@ -262,6 +298,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

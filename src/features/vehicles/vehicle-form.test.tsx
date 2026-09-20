@@ -28,6 +28,7 @@ describe('VehicleForm', () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         name: 'カブ',
+        modelCode: '',
         vehicleType: 'motorcycle',
         shakenExpiryDate: null,
         note: '',
@@ -41,14 +42,35 @@ describe('VehicleForm', () => {
     render(<VehicleForm submitLabel="登録" onSubmit={onSubmit} />)
 
     await user.type(screen.getByLabelText('車種名'), 'ロードスター')
-    await user.type(screen.getByLabelText('車検満了日（任意）'), '2027-05-01')
+    await user.type(screen.getByLabelText('車検満了日'), '2027-05-01')
     await user.click(screen.getByRole('button', { name: '登録' }))
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         name: 'ロードスター',
+        modelCode: '',
         vehicleType: 'car',
         shakenExpiryDate: '2027-05-01',
+        note: '',
+      })
+    })
+  })
+
+  it('型式を入力して送信するとそのまま渡す', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn().mockResolvedValue({ success: true })
+    render(<VehicleForm submitLabel="登録" onSubmit={onSubmit} />)
+
+    await user.type(screen.getByLabelText('車種名'), 'スイフトスポーツ')
+    await user.type(screen.getByLabelText('型式'), 'ZC33S')
+    await user.click(screen.getByRole('button', { name: '登録' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        name: 'スイフトスポーツ',
+        modelCode: 'ZC33S',
+        vehicleType: 'car',
+        shakenExpiryDate: null,
         note: '',
       })
     })
@@ -69,7 +91,7 @@ describe('VehicleForm', () => {
     render(
       <VehicleForm
         submitLabel="更新"
-        initialValues={{ name: 'カブ', vehicleType: 'motorcycle', shakenExpiryDate: null, note: 'メモ' }}
+        initialValues={{ name: 'カブ', modelCode: '', vehicleType: 'motorcycle', shakenExpiryDate: null, note: 'メモ' }}
         onSubmit={vi.fn()}
       />,
     )

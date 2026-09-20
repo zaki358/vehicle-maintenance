@@ -1,0 +1,117 @@
+/*
+ * ページの骨格。セクションは全幅のタイルで、境界線ではなく
+ * 背景色の切り替わりそのものが区切りになる（design.md の Layout）。
+ */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  padding: var(--space-section) var(--space-lg);
+  background: var(--canvas-parchment);
+}
+
+.section-light {
+  background: var(--canvas);
+}
+
+.section-dark {
+  background: var(--surface-tile-1);
+  color: var(--body-on-dark);
+}
+
+.section-dark a {
+  color: var(--color-primary-on-dark);
+}
+
+/* 通常のセクションより詰めたい実務画面向け */
+.section-compact {
+  padding: var(--space-xxl) var(--space-lg);
+}
+
+.container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* フォームなど、読ませる/入力させる画面は幅を絞る */
+.container-narrow {
+  max-width: 680px;
+}
+
+.container-reading {
+  max-width: var(--content-max-reading);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.stack-tight {
+  gap: var(--space-sm);
+}
+
+.stack-loose {
+  gap: var(--space-xl);
+}
+
+/* 見出し＋説明の組 */
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+
+.section-head-lead {
+  font-size: var(--text-lead-size);
+  line-height: 1.14;
+  letter-spacing: 0.196px;
+  color: var(--ink-muted-80);
+}
+
+.section-dark .section-head-lead {
+  color: var(--body-muted);
+}
+
+/* 見出しに添える補足（ログイン中のメールなど）。長い文字列でも折り返して収める */
+.section-head-note {
+  font-size: var(--text-caption-size);
+  line-height: var(--leading-caption);
+  letter-spacing: var(--tracking-caption);
+  color: var(--ink-muted-48);
+  overflow-wrap: anywhere;
+}
+
+/* カードのグリッド。5→4→3→2→1 と畳む（design.md の Collapsing Strategy） */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (max-width: 1068px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .section {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+}

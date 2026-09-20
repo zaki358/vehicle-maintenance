@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>page-header.tsx</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>page-header.tsx</h1>
+    <div class="doc-path">src/components/page-header.tsx</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      黒いグローバルナビ（<code>AppNav</code>）の直下に貼り付く、
+      すりガラス調のサブナビを描画する小さなコンポーネントです
+      （design.md の <code>sub-nav-frosted</code>）。左にページ名、
+      右にそのページの主要アクションを置きます。
+    </p>
+    <p>
+      各ページが自前で見出しバーを組み立てると、余白やフォントが少しずつ
+      ずれていきます。<code>title</code> と <code>actions</code> の2つだけを
+      受け取る共通部品にすることで、全画面で同じ形が保たれます。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PageHeaderProps</code></td><td>interface</td><td>props の型（非 export）</td></tr>
+        <tr><td><code>title</code></td><td>prop（必須）</td><td>ページ名。<code>&lt;h1&gt;</code> として描画される</td></tr>
+        <tr><td><code>actions</code></td><td>prop（任意）</td><td>右端に置くボタン等の ReactNode</td></tr>
+        <tr><td><code>PageHeader</code></td><td>component（export）</td><td>サブナビ本体</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>import type { ReactNode } from 'react'
+
+interface PageHeaderProps {
+  title: string
+  actions?: ReactNode
+}</code></pre>
+      <p>
+        <code>import type</code> を使うと、この import はビルド時に完全に
+        消えます（型だけを参照しており、実行時には不要なため）。
+      </p>
+      <p>
+        <code>actions</code> の型を <code>ReactNode</code> にしているのが要点です。
+        ボタンの配列でも、単一のリンクでも、<code>&lt;&gt;...&lt;/&gt;</code> で
+        まとめた複数要素でも受け取れます。このコンポーネントは
+        「何を置くか」には関知せず、<strong>置き場所と余白だけ</strong>を
+        提供します。<code>?</code> により省略も可能で、アクションが無いページ
+        （ログイン後のダッシュボードなど）でもそのまま使えます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/**
+ * ナビの下に貼り付く、すりガラスのサブナビ（design.md の sub-nav-frosted）。
+ * 左にページ名、右にそのページの主要アクションを置く。
+ *
+ * ページ名は見た目こそ小さいが、そのページの主見出しなので `&lt;h1&gt;` にしている
+ * （支援技術やテストがページを特定する手がかりになる）。本文側の見出しは `&lt;h2&gt;` から始める。
+ */</code></pre>
+      <p>
+        <strong>見た目と意味を切り離す</strong>という判断が書かれています。
+        サブナビのページ名は 21px と小さく、<code>base.css</code> が
+        <code>h1</code> に与える 40px とはまったく違う見た目です。それでも
+        マークアップは <code>&lt;h1&gt;</code> にしています。
+      </p>
+      <p>
+        理由は2つあります。ひとつは支援技術で、スクリーンリーダーの
+        利用者は見出しの一覧から「今どのページにいるか」を把握します。
+        もうひとつは E2E テストで、Playwright の
+        <code>getByRole('heading', { level: 1 })</code> がページ特定の
+        安定した手がかりになります。
+      </p>
+      <p>
+        この前提があるため、各ページの本文側の見出しは
+        <strong><code>&lt;h2&gt;</code> から始める</strong>という規約が付随します。
+        本文でも <code>h1</code> を使うと1ページに主見出しが2つ生まれ、
+        見出し階層が壊れます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>export function PageHeader({ title, actions }: PageHeaderProps) {
+  return (
+    &lt;div className="sub-nav"&gt;
+      &lt;h1 className="sub-nav-title"&gt;{title}&lt;/h1&gt;
+      {actions &amp;&amp; &lt;div className="sub-nav-actions"&gt;{actions}&lt;/div&gt;}
+    &lt;/div&gt;
+  )
+}</code></pre>
+      <p>
+        状態を持たない純粋な表示コンポーネントです。すりガラスの表現
+        （半透明背景 + <code>backdrop-filter</code>）、上部への固定
+        （<code>position: sticky; top: var(--nav-height)</code>）、
+        右寄せなどは、すべて <code>nav.css</code> の <code>.sub-nav</code> 系
+        クラスが受け持ちます。JSX 側は構造だけを担当します。
+      </p>
+      <p>
+        <code>{actions &amp;&amp; ...}</code> により、アクションが無いときは
+        <code>.sub-nav-actions</code> の <code>&lt;div&gt;</code> 自体を出しません。
+        空の要素を残すと <code>gap</code> の分だけ余白が生まれ、
+        ページによってバーの見た目がわずかにずれてしまうためです。
+      </p>
+      <p>
+        外側が <code>&lt;nav&gt;</code> ではなく <code>&lt;div&gt;</code> なのは、
+        ナビゲーションのランドマークは <code>AppNav</code> の
+        <code>&lt;nav&gt;</code> が既に担っているからです。ランドマークを
+        重複させると、支援技術での読み飛ばし操作がかえって煩雑になります。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/components/page-header.tsx
+  </footer>
+
+</div>
+</body>
+</html>

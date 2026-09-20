@@ -380,12 +380,242 @@ $$;</code></pre>
 
   </section>
 
+  <section class="doc-section">
+    <h2>追加マイグレーション（2026-09-20）— 型式の追加と作業内容の作り直し</h2>
+    <p>
+      車両に「型式」を足し、整備記録の作業内容を9区分へ入れ替える2本を追加した。
+      前者は単純な列追加だが、後者はテーブルの列構成と CHECK 制約を作り替える
+      破壊的な変更を含む。
+    </p>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>ファイル</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>20260920110000_add_vehicle_model_code.sql</code></td><td>alter table</td><td><code>vehicles</code> に <code>model_code</code>（型式）を追加</td></tr>
+        <tr><td><code>20260920110100_rework_maintenance_work_types.sql</code></td><td>alter table / delete</td><td>作業内容を9区分へ入れ替え、区分ごとの入力列と CHECK 制約を張り直す</td></tr>
+      </tbody>
+    </table>
+
+    <h3>6. 20260920110000_add_vehicle_model_code.sql — 車両に型式を追加</h3>
+    <div class="doc-chunk">
+      <pre><code>alter table public.vehicles
+  add column model_code text not null default '';
+
+comment on column public.vehicles.model_code is '型式（任意）。例: ZC33S';</code></pre>
+      <p>
+        車種名だけでは同名の別グレードを区別しづらいため、補足として型式を
+        持たせる。一覧・詳細で車種名に添えて表示する。
+      </p>
+      <p>
+        <strong><code>nullable</code> ではなく <code>not null default ''</code> にしている</strong>
+        のが判断点。任意入力の列を <code>nullable</code> にすると、「<code>null</code>」と
+        「空文字」という2つの「未入力」が生まれ、表示・比較・検索のたびに両方を
+        考慮しなければならなくなる。既存の任意テキスト列（<code>note</code>、
+        <code>part_detail</code>）と同じく空文字に一本化した。
+        Zod 側（<code>vehicle-schema.ts</code>）の <code>modelCode</code> も
+        <code>.default('')</code> で揃えてある。
+      </p>
+      <p>
+        <code>default ''</code> を付けているため、既存行はすべて空文字で埋まり、
+        <code>not null</code> 制約と両立する。データ移行のコードは要らない。
+      </p>
+      <p>
+        文字数の上限（50文字）はここに書かず、サーバー関数の入口の Zod が持つ。
+        既存の <code>name</code> / <code>note</code> と同じ「長さの上限はアプリの
+        入力ポリシー、構造は DB」という役割分担。
+      </p>
+    </div>
+
+    <h3>7. 20260920110100_rework_maintenance_work_types.sql — 作業内容を9区分へ</h3>
+    <p>
+      旧区分（<code>engine_oil</code> / <code>oil_element</code> / <code>tire</code> /
+      <code>brake_pad</code> / <code>battery</code> / <code>shaken</code> /
+      <code>other</code>）は「<strong>何を交換したか</strong>」を区分名そのもので表していた。
+      この形は部品が増えるたびに区分を増やす必要があり、区分に収まらないものを
+      受けるための自由入力列 <code>work_type_other</code> も抱えていた。
+      新しい9区分は「<strong>どういう作業か</strong>」で分け、具体的な内容は
+      <code>detail</code> 列に書く。これで区分を増やさずに任意の整備を記録できる。
+    </p>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>区分</th><th>意味</th><th>その区分で使う列</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>engine_oil</code></td><td>エンジンオイル</td><td><code>oil_type</code>, <code>element_changed</code></td></tr>
+        <tr><td><code>fluid</code></td><td>油脂類交換</td><td><code>detail</code>（交換箇所。例: ミッション）, <code>oil_type</code></td></tr>
+        <tr><td><code>part</code></td><td>部品交換</td><td><code>detail</code>（交換内容）, <code>part_detail</code>（部品型式・必須）</td></tr>
+        <tr><td><code>repair</code></td><td>修理</td><td><code>detail</code>（修理内容）, <code>part_detail</code>（任意）</td></tr>
+        <tr><td><code>adjust</code></td><td>調整</td><td><code>detail</code>（調整内容）</td></tr>
+        <tr><td><code>tuning</code></td><td>チューニング</td><td><code>detail</code>（内容）, <code>part_detail</code>（任意）</td></tr>
+        <tr><td><code>modification</code></td><td>改造</td><td><code>detail</code>（内容）, <code>part_detail</code>（任意）</td></tr>
+        <tr><td><code>shaken</code></td><td>車検</td><td>（走行距離と備考のみ）</td></tr>
+        <tr><td><code>other</code></td><td>その他</td><td><code>detail</code>（作業内容）, <code>part_detail</code>（任意）</td></tr>
+      </tbody>
+    </table>
+    <p>
+      共通項目は <code>performed_on</code>（作業日）・<code>odometer_km</code>（走行距離）・
+      <code>note</code>（備考）。この表は <code>lib/work-types.ts</code> の
+      <code>workTypeFields()</code> が返す構成とそのまま対応しており、
+      画面・Zod・DB の3層が同じルールを持つ。
+    </p>
+
+    <div class="doc-chunk">
+      <pre><code>-- 1. 既存の整備記録を削除する
+delete from public.maintenance_records;</code></pre>
+      <p>
+        <strong>既存データは依頼者の判断で全削除する。</strong>
+        旧区分から新区分への対応付けは情報の欠落を伴うため（例:
+        <code>tire</code> は <code>part</code> に移せるが、「何を交換したか」を書くべき
+        <code>detail</code> に入れる文言がどこにも無い）、機械的に変換するより
+        入れ直す方を選んだ。運用開始前のため実害が小さい、という前提での判断。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>do $$
+declare
+  constraint_name text;
+begin
+  for constraint_name in
+    select con.conname
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace nsp on nsp.oid = rel.relnamespace
+    where nsp.nspname = 'public'
+      and rel.relname = 'maintenance_records'
+      and con.contype = 'c'
+      and pg_get_constraintdef(con.oid) like '%work_type%'
+  loop
+    execute format('alter table public.maintenance_records drop constraint %I', constraint_name);
+  end loop;
+end $$;</code></pre>
+      <p>
+        旧 CHECK 制約の削除。<strong>制約名を決め打ちしていない</strong>のが要点で、
+        テーブル作成時にインラインで書いた CHECK は Postgres が名前を自動採番する
+        （<code>maintenance_records_check</code>、<code>maintenance_records_check1</code>
+        など、書いた順で番号が変わる）。名前を直接指定すると、適用する環境
+        （開発用・本番用の各 Supabase プロジェクト）で採番がずれたときに
+        マイグレーションが落ちる。
+      </p>
+      <p>
+        そこで <code>pg_constraint</code> を引き、定義文
+        （<code>pg_get_constraintdef</code>）に <code>work_type</code> が現れる CHECK
+        制約をすべて探して外す。<code>contype = 'c'</code> で CHECK に限定し、
+        <code>format(... %I)</code> で識別子として安全にクォートしている。
+        該当が0件でもループが回らないだけでエラーにならないため、
+        何度実行しても安全（冪等）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>alter table public.maintenance_records
+  drop column work_type_other;
+
+alter table public.maintenance_records
+  add column detail text not null default '',
+  add column oil_type text not null default '',
+  add column element_changed boolean not null default false;
+
+comment on column public.maintenance_records.detail is '作業の内容。交換内容/修理内容/調整内容/油脂の交換箇所など、区分ごとに意味が変わる';
+comment on column public.maintenance_records.oil_type is '油種。engine_oil と fluid でのみ使う（任意）';
+comment on column public.maintenance_records.element_changed is 'オイルエレメントを同時交換したか。engine_oil でのみ使う';</code></pre>
+      <p>
+        列の入れ替え。旧「その他」の自由入力だった <code>work_type_other</code> を落とし、
+        <code>detail</code>・<code>oil_type</code>・<code>element_changed</code> を足す。
+        テキスト列はいずれも <code>not null default ''</code> で、
+        <code>model_code</code> と同じく「未入力＝空文字」に統一している。
+      </p>
+      <p>
+        <code>detail</code> は<strong>区分によって意味が変わる</strong>列で、
+        画面上の見出しも「交換箇所 / 交換内容 / 修理内容 / 調整内容 /
+        チューニング内容 / 改造内容 / 作業内容」と切り替わる。列コメントに
+        その旨を明記しているのは、SQL Editor から直接テーブルを見た人が
+        意味を取り違えないようにするため。
+      </p>
+      <p>
+        <code>oil_type</code> と <code>element_changed</code> は特定の区分でしか
+        使わないが、別テーブルには分けず同じ行に持たせている。区分ごとに
+        テーブルを分けると一覧の取得が複雑になる割に、列数はこの程度で収まるため。
+        使わない区分で値が入らないことは、Zod の <code>transform</code>
+        （<code>record-schema.ts</code>）が保存前に空へ戻すことで担保する。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>alter table public.maintenance_records
+  add constraint maintenance_records_work_type_check check (
+    work_type in (
+      'engine_oil', 'fluid', 'part', 'repair', 'adjust',
+      'tuning', 'modification', 'shaken', 'other'
+    )
+  );</code></pre>
+      <p>
+        新しい区分の CHECK。今回は<strong>明示的に名前を付けている</strong>
+        （<code>maintenance_records_work_type_check</code>）。前述の自動採番問題を
+        繰り返さないためで、次にこの制約を差し替えるときは名前で確実に落とせる。
+      </p>
+      <p>
+        列挙型（<code>create type ... as enum</code>）ではなく CHECK を使うのは、
+        値の追加・削除が <code>alter table</code> だけで済み、
+        Zod 側の <code>WORK_TYPES</code> と対応関係を読み取りやすいため。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>alter table public.maintenance_records
+  add constraint maintenance_records_detail_required check (
+    work_type not in ('fluid', 'part', 'repair', 'adjust', 'tuning', 'modification', 'other')
+    or char_length(detail) &gt; 0
+  );
+
+alter table public.maintenance_records
+  add constraint maintenance_records_part_detail_required check (
+    work_type &lt;&gt; 'part' or char_length(part_detail) &gt; 0
+  );</code></pre>
+      <p>
+        <strong>区分ごとの必須項目を DB 側でも強制する。</strong>
+        「何をしたか」が空のまま残ると、後から読んで意味の取れない記録になる。
+        そのため <code>detail</code> を必要とする7区分では空文字を弾く。
+        <code>engine_oil</code> と <code>shaken</code> を除外しているのは、
+        この2つは区分名自体が作業内容を表しており <code>detail</code> を要求する
+        意味がないため。
+      </p>
+      <p>
+        部品型式は <code>part</code>（部品交換）でのみ必須。部品交換は
+        「どの部品を入れたか」が記録の核だから。修理・チューニング・改造・その他では
+        部品を伴わない作業もありうるので任意にしている。
+      </p>
+      <p>
+        <code>A or B</code> の形で「その区分でなければ無条件に通す」と書くのは、
+        区分ごとの条件付き必須を CHECK で表す定石。<code>char_length(...) &gt; 0</code>
+        を使うのは、列が <code>not null</code> なので <code>null</code> 判定ではなく
+        空文字判定が必要なため。
+      </p>
+      <p>
+        この2つの制約は <code>workTypeFields()</code> の <code>required</code> 指定と
+        同じ内容で、画面・Zod・DB の3層で同じルールを守る。どこを迂回されても
+        不正な行は入らない。
+      </p>
+    </div>
+
+    <p>
+      この2本も、これまでと同じく開発用・本番用の両 Supabase プロジェクトへ
+      「SQL Editor への手動貼り付け」方式で適用する必要がある
+      （<code>.claude/agent-memory/progress.md</code> の「判断の記録」参照）。
+      <strong><code>delete from public.maintenance_records</code> を含むため、
+      適用先のプロジェクトを取り違えないこと。</strong>
+    </p>
+  </section>
+
   <footer class="doc-footer">
-    生成日: 2026-09-19（Phase 8で5.の修正を追記） ／ 対象ファイル: supabase/migrations/20260907230000_create_set_updated_at_function.sql,
+    生成日: 2026-09-19（Phase 8で5.の修正を追記、2026-09-20に6.・7.を追記） ／ 対象ファイル: supabase/migrations/20260907230000_create_set_updated_at_function.sql,
     supabase/migrations/20260907230100_create_vehicles.sql,
     supabase/migrations/20260907230200_create_maintenance_records.sql,
     supabase/migrations/20260907230300_create_complete_shaken_function.sql,
-    supabase/migrations/20260919220000_fix_complete_shaken_ownership_check.sql
+    supabase/migrations/20260919220000_fix_complete_shaken_ownership_check.sql,
+    supabase/migrations/20260920110000_add_vehicle_model_code.sql,
+    supabase/migrations/20260920110100_rework_maintenance_work_types.sql
   </footer>
 
 </div>

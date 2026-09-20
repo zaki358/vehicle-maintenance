@@ -21,6 +21,7 @@ export async function createVehicleHandler(input: VehicleInput, deps: CreateVehi
     .from('vehicles')
     .insert({
       name: input.name,
+      model_code: input.modelCode,
       vehicle_type: input.vehicleType,
       shaken_expiry_date: input.shakenExpiryDate,
       note: input.note,

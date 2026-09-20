@@ -43,13 +43,13 @@ test.describe('車検完了', () => {
       shakenExpiryDate: '2027-01-01',
     })
 
-    await gotoReady(page, `/vehicles/${vehicle.id}/shaken`)
-    await page.getByLabel('受検日').fill('2026-10-15')
+    await gotoReady(page, `/vehicles/${vehicle.id}/records/new?workType=shaken`)
+    await page.getByLabel('車検日').fill('2026-10-15')
     // 有効期間はデフォルトで2年のためそのまま送信する
-    await page.getByRole('button', { name: '車検完了を記録' }).click()
+    await page.getByRole('button', { name: '登録' }).click()
 
     await expect(page).toHaveURL(`/vehicles/${vehicle.id}`)
-    await expect(page.getByText(/車検満了日: 2028年10月15日/)).toBeVisible()
+    await expect(page.getByText(/2028年10月15日/)).toBeVisible()
     await expect(page.getByText(/2026年10月15日/)).toBeVisible()
 
     const { data: updatedVehicle } = await user.client.from('vehicles').select().eq('id', vehicle.id).single()
@@ -68,13 +68,13 @@ test.describe('車検完了', () => {
       shakenExpiryDate: '2027-06-01',
     })
 
-    await gotoReady(page, `/vehicles/${vehicle.id}/shaken`)
-    await page.getByLabel('受検日').fill('2026-10-15')
+    await gotoReady(page, `/vehicles/${vehicle.id}/records/new?workType=shaken`)
+    await page.getByLabel('車検日').fill('2026-10-15')
     await page.getByLabel('有効期間').selectOption('3')
-    await page.getByRole('button', { name: '車検完了を記録' }).click()
+    await page.getByRole('button', { name: '登録' }).click()
 
     await expect(page).toHaveURL(`/vehicles/${vehicle.id}`)
-    await expect(page.getByText(/車検満了日: 2029年10月15日/)).toBeVisible()
+    await expect(page.getByText(/2029年10月15日/)).toBeVisible()
 
     const { data: updatedVehicle } = await user.client.from('vehicles').select().eq('id', vehicle.id).single()
     expect(updatedVehicle?.shaken_expiry_date).toBe('2029-10-15')

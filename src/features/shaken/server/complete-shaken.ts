@@ -38,7 +38,6 @@ export async function completeShakenHandler(
     p_performed_on: input.shaken.performedOn,
     p_new_expiry_date: input.shaken.newExpiryDate,
     p_odometer_km: input.shaken.odometerKm ?? undefined,
-    p_part_detail: input.shaken.partDetail,
     p_note: input.shaken.note,
   })
   if (error) {

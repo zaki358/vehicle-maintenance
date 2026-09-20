@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>layout.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>layout.css</h1>
+    <div class="doc-path">src/styles/layout.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ページの骨格を作るユーティリティクラス群です。全幅のタイル（<code>.section</code>）、
+      中央寄せの内容幅（<code>.container</code>）、縦積み（<code>.stack</code>）、
+      カードのグリッド（<code>.card-grid</code>）といった、どの画面でも使い回す
+      入れ物だけを定義しています。
+    </p>
+    <p>
+      design.md の Layout では、セクションの区切りは<strong>境界線ではなく
+      背景色の切り替わりそのもの</strong>で表す、とされています。
+      そのため <code>.section</code> 系は色違いのバリエーションを持ち、
+      <code>border</code> を一切持ちません。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>.page</code></td><td>クラス</td><td>ページ全体の縦フレックス。最低画面高を確保</td></tr>
+        <tr><td><code>.section</code></td><td>クラス</td><td>全幅タイル。既定は parchment 背景</td></tr>
+        <tr><td><code>.section-light</code> / <code>.section-dark</code></td><td>修飾クラス</td><td>白タイル／暗タイル</td></tr>
+        <tr><td><code>.section-compact</code></td><td>修飾クラス</td><td>実務画面向けに上下余白を詰める</td></tr>
+        <tr><td><code>.container</code></td><td>クラス</td><td>最大 1440px で中央寄せ</td></tr>
+        <tr><td><code>.container-narrow</code> / <code>.container-reading</code></td><td>修飾クラス</td><td>フォーム用 680px／読み物用 980px</td></tr>
+        <tr><td><code>.stack</code> / <code>-tight</code> / <code>-loose</code></td><td>クラス</td><td>縦積みと余白の3段階</td></tr>
+        <tr><td><code>.section-head</code> ほか</td><td>クラス</td><td>見出し＋リード文＋補足の組</td></tr>
+        <tr><td><code>.card-grid</code></td><td>クラス</td><td>3→2→1 列に畳むカードグリッド</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}</code></pre>
+      <p>
+        ページ全体を縦フレックスにし、最低でも画面の高さを確保します。
+        内容が少ない画面（空の車両一覧など）でも背景が画面下まで伸び、
+        ブラウザの地色が覗かないようにするためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.section {
+  padding: var(--space-section) var(--space-lg);
+  background: var(--canvas-parchment);
+}
+
+.section-light { background: var(--canvas); }
+
+.section-dark {
+  background: var(--surface-tile-1);
+  color: var(--body-on-dark);
+}
+
+.section-dark a { color: var(--color-primary-on-dark); }</code></pre>
+      <p>
+        <code>.section</code> は上下に <code>--space-section</code>（デスクトップ 80px、
+        735px 以下では 48px）、左右に 24px の余白を持つ全幅タイルです。
+        タイルを縦に並べたとき、背景色の切り替わりが区切り線の役目を果たすので、
+        <code>border-top</code> の類は書きません。
+      </p>
+      <p>
+        <code>.section-dark</code> は背景だけでなく文字色も同時に反転させ、
+        さらに<strong>子孫のリンク色まで</strong>明るい青に差し替えます。
+        これを忘れると暗背景の上に <code>#0066cc</code> のリンクが乗って
+        読めなくなるため、タイル側でまとめて面倒を見るのが安全です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 通常のセクションより詰めたい実務画面向け */
+.section-compact {
+  padding: var(--space-xxl) var(--space-lg);
+}</code></pre>
+      <p>
+        design.md が想定する 80px 余白は製品紹介ページ向けの密度で、
+        一覧や入力フォームのような<strong>作業画面</strong>ではスクロールが
+        増えすぎます。そこで 48px に詰めた変種を用意しました。
+        新しい数値を発明せず <code>--space-xxl</code> を流用しているので、
+        余白の階段からは外れません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+.container-narrow { max-width: 680px; }
+.container-reading { max-width: var(--content-max-reading); }</code></pre>
+      <p>
+        タイルは全幅でも、中身は読みやすい幅に制限します。
+        <code>.container-narrow</code>（680px）はフォーム用です。入力欄を
+        画面いっぱいに広げると、ラベルと入力内容の視線移動が長くなり、
+        1行の文字数も増えて読みづらくなります。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.stack-tight { gap: var(--space-sm); }
+.stack-loose { gap: var(--space-xl); }</code></pre>
+      <p>
+        縦方向の余白はすべて <code>gap</code> で与えます。margin を使わないことで
+        マージンの相殺が起こらず、「最後の要素だけ余白が残る」といった
+        後始末（<code>:last-child</code> の打ち消し）も不要になります。
+        <code>base.css</code> で見出しや段落の margin を 0 にしてあるのは、
+        この方針を成立させるためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+
+.section-head-lead {
+  font-size: var(--text-lead-size);
+  line-height: 1.14;
+  letter-spacing: 0.196px;
+  color: var(--ink-muted-80);
+}
+
+.section-dark .section-head-lead { color: var(--body-muted); }</code></pre>
+      <p>
+        見出しとリード文の組です。リード文の字間が<strong>正の値</strong>
+        （0.196px）なのは design.md の lead タイポグラフィに由来します。
+        本文（17px）は詰め、大きなリード文（28px）はわずかに開く、という
+        サイズごとの調整が元の仕様に含まれています。
+      </p>
+      <p>
+        暗いタイルの中では文字色を <code>--body-muted</code> に差し替えます。
+        <code>--ink-muted-80</code>（#333333）は暗背景上ではほぼ見えないためです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 見出しに添える補足（ログイン中のメールなど）。長い文字列でも折り返して収める */
+.section-head-note {
+  font-size: var(--text-caption-size);
+  ...
+  color: var(--ink-muted-48);
+  overflow-wrap: anywhere;
+}</code></pre>
+      <p>
+        <code>overflow-wrap: anywhere</code> が要点です。ここにはログイン中の
+        メールアドレスのような<strong>空白を含まない長い文字列</strong>が入ります。
+        通常の折り返しは単語の途中で切れないため、狭い画面では横スクロールが
+        発生してしまいます。<code>anywhere</code> を指定すると文字の途中でも
+        改行できるようになり、レイアウトが壊れません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (max-width: 1068px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .card-grid { grid-template-columns: 1fr; gap: var(--space-md); } }</code></pre>
+      <p>
+        車両カードの並びです。design.md の Collapsing Strategy に沿って
+        3列 → 2列 → 1列と畳みます。区切りの 1068px は design.md が定める
+        ブレークポイント（Apple のレイアウト幅に由来）をそのまま使っています。
+      </p>
+      <p>
+        1列になる段階では <code>gap</code> も 24px から 17px に詰めます。
+        横並びが無くなると縦の余白だけが残るため、同じ 24px では
+        間延びして見えるからです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>@media (max-width: 480px) {
+  .section {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+}</code></pre>
+      <p>
+        小さな画面では左右の余白を 24px から 17px に詰め、内容に使える幅を
+        14px 広げます。<code>nav.css</code> も同じ 480px の境界で同じ値に
+        詰めており、ナビの左端とコンテンツの左端が揃い続けます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/layout.css
+  </footer>
+
+</div>
+</body>
+</html>

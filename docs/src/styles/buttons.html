@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>buttons.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>buttons.css</h1>
+    <div class="doc-path">src/styles/buttons.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      ボタンのスタイルです。design.md の Buttons が定める文法は
+      <strong>ピル型の主ボタン・輪郭だけの副ボタン・小さな実務ボタン</strong>の
+      3つだけで、このファイルもそれに従います（加えてカード内用の
+      <code>.btn-pearl</code> を派生として持ちます）。
+    </p>
+    <p>
+      特徴は<strong>ホバー状態を定義しない</strong>ことです。Apple のボタンは
+      マウスを乗せても色が変わらず、押した瞬間だけ <code>scale(0.95)</code> で
+      わずかに縮みます。タッチ操作にホバーが存在しないことを前提にした設計で、
+      マウスとタッチで挙動が食い違いません。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>.btn</code></td><td>基底クラス</td><td>全ボタン共通の寸法・書体・押下アニメーション</td></tr>
+        <tr><td><code>.btn:active</code> / <code>:disabled</code> / <code>:hover</code></td><td>状態</td><td>押下で縮小、無効で淡色、ホバーは何もしない</td></tr>
+        <tr><td><code>.btn-primary</code></td><td>修飾クラス</td><td>青のフルピル。主要アクション</td></tr>
+        <tr><td><code>.btn-secondary</code></td><td>修飾クラス</td><td>青の輪郭だけのゴーストピル</td></tr>
+        <tr><td><code>.btn-utility</code></td><td>修飾クラス</td><td>ナビ内の小さな実務ボタン</td></tr>
+        <tr><td><code>.nav .btn-utility</code></td><td>文脈上書き</td><td>黒背景では輪郭だけの淡色に</td></tr>
+        <tr><td><code>.btn-pearl</code></td><td>修飾クラス</td><td>カード内の控えめな第2アクション</td></tr>
+        <tr><td><code>.btn-row</code></td><td>クラス</td><td>横並びのアクション群。狭い画面では全幅</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target);
+  border: none;
+  font-family: var(--font-text);
+  font-size: var(--text-body-size);
+  line-height: 1;
+  letter-spacing: var(--tracking-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.12s ease-out;
+}</code></pre>
+      <p>
+        <code>inline-flex</code> と中央揃えにより、<code>&lt;button&gt;</code> でも
+        <code>&lt;a&gt;</code>（TanStack Router の <code>&lt;Link&gt;</code>）でも
+        同じ見た目になります。ボタンに見えるリンクとリンクに見えるボタンが
+        混在しても、寸法と文字位置が揃います。
+      </p>
+      <p>
+        <code>font-family</code> をわざわざ指定しているのは、フォーム要素が
+        <code>body</code> のフォントを自動では継承せず、ブラウザ既定の
+        フォントになってしまうためです。
+      </p>
+      <p>
+        <code>min-height: var(--touch-target)</code>（44px）で最小タップ領域を
+        保証します。<code>line-height: 1</code> にしているのは、本文の 1.47 のままだと
+        パディングと合算して意図より背が高くなるからです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn:disabled {
+  color: var(--ink-muted-48);
+  cursor: not-allowed;
+}
+
+.btn:hover {
+  text-decoration: none;
+}</code></pre>
+      <p>
+        押下フィードバックは全種類共通で <code>scale(0.95)</code>。
+        <code>:not(:disabled)</code> を付けているので、無効化されたボタンを
+        押しても縮まず、「押せなかった」ことが伝わります。
+      </p>
+      <p>
+        <code>.btn:hover</code> が <code>text-decoration: none</code> だけなのは、
+        <code>base.css</code> の <code>a:hover</code> が下線を付けてしまうのを
+        打ち消すためです。<strong>ホバーで見た目を変えない</strong>という
+        design.md の方針を守るために、あえて「何も起きない」を明示しています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 主要アクション。青のフルピル＝「押せる」の合図 */
+.btn-primary {
+  padding: 11px 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.btn-primary:disabled {
+  background: var(--hairline);
+}</code></pre>
+      <p>
+        完全な角丸（<code>--radius-pill</code> = 9999px）の青いピルが、
+        このシステムで最も強い「押せる」の合図です。1画面に1つだけ置くのが原則で、
+        「保存する」「車両を追加」などがこれにあたります。
+      </p>
+      <p>
+        無効時は背景を淡いグレー（<code>--hairline</code>）に落とします。
+        基底クラス側で文字色も <code>--ink-muted-48</code> になるため、
+        グレー地にグレー文字という控えめな見た目になり、青と明確に区別できます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 2つ目のCTA。青の輪郭だけのゴーストピル */
+.btn-secondary {
+  padding: 11px 22px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-primary);
+}</code></pre>
+      <p>
+        主ボタンと同じ形・同じ色でありながら、塗りを抜くことで格を1段下げます。
+        第2のアクセント色を足さずに優先度の差を作る、というのが design.md の
+        考え方です（「押せる」の信号はすべてこの青ひとつ）。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* ナビ内の小さな実務アクション（ログアウト等） */
+.btn-utility {
+  min-height: 32px;
+  padding: 8px 15px;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--body-on-dark);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}</code></pre>
+      <p>
+        ピルではなく <strong>8px の角丸</strong>の小さな箱で、ログアウトのような
+        事務的な操作に使います。<code>min-height</code> を 32px に落として
+        44px の原則から外れていますが、これは design.md が
+        「グローバルナビのユーティリティリンクは、精密なデスクトップ操作である
+        ことを理由に意図的に小さい」と明記している箇所に沿ったものです。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 黒背景のナビ上では ink が沈むため、輪郭だけの淡色にする */
+.nav .btn-utility {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}</code></pre>
+      <p>
+        <code>--ink</code>（#1d1d1f）の箱を純黒のナビに置くと、色が近すぎて
+        ボタンの輪郭が消えます。そこでナビの中でだけ塗りを抜き、
+        半透明の白い枠に差し替えます。<code>.nav</code> を前置した
+        <strong>文脈依存の上書き</strong>なので、新しいクラス名を増やさずに
+        済みます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* カード内の控えめな第2アクション */
+.btn-pearl {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 3px solid var(--divider-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  color: var(--ink-muted-80);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}</code></pre>
+      <p>
+        車両カードの「編集」「記録を見る」など、カード内に複数並ぶ操作用です。
+        枠線が <strong>3px</strong> と太いのは、design.md が
+        <code>divider-soft</code> を「硬い線というよりリングシャドウとして働く」
+        トーンと位置づけているためで、極薄の色を厚く敷くことで
+        影を使わずに柔らかい縁取りを作っています。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 横並びのアクション群 */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .btn-row &gt; .btn {
+    flex: 1 1 100%;
+  }
+}</code></pre>
+      <p>
+        複数ボタンを横に並べる入れ物です。<code>flex-wrap: wrap</code> により
+        入りきらなければ自然に折り返します。
+      </p>
+      <p>
+        480px 以下では <code>flex: 1 1 100%</code> で各ボタンを全幅にし、
+        縦積みにします。狭い画面で小さなボタンが肩を並べると押し間違いが
+        起きやすいため、1行1操作にして誤タップを防ぎます。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/buttons.css
+  </footer>
+
+</div>
+</body>
+</html>

@@ -35,19 +35,19 @@ test.describe('モバイル人間工学', () => {
 
   test('ダッシュボードから記録追加まで2タップで到達できる', async ({ page }) => {
     await page.getByRole('link', { name: vehicleName }).click() // タップ1: 車両詳細へ
-    await page.getByRole('link', { name: '＋ 整備記録を追加' }).click() // タップ2: 記録追加へ
+    await page.getByRole('link', { name: '整備を記録' }).click() // タップ2: 記録追加へ
     await expect(page).toHaveURL(/\/records\/new$/)
-    await expect(page.getByRole('heading', { name: `${vehicleName} の整備記録を追加` })).toBeVisible()
+    await expect(page.getByText('整備記録を追加')).toBeVisible()
   })
 
   test('375px幅で横スクロールが発生しない(ダッシュボード・詳細・記録追加)', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: '車両メンテナンス記録' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '登録車両' })).toBeVisible()
     expect(await hasHorizontalOverflow(page)).toBe(false)
 
     await page.getByRole('link', { name: vehicleName }).click()
     expect(await hasHorizontalOverflow(page)).toBe(false)
 
-    await page.getByRole('link', { name: '＋ 整備記録を追加' }).click()
+    await page.getByRole('link', { name: '整備を記録' }).click()
     expect(await hasHorizontalOverflow(page)).toBe(false)
   })
 })

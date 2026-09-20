@@ -1,6 +1,7 @@
 import { Link, createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
+import { PageHeader } from '@/components/page-header'
 import { deleteVehicleFn } from '@/features/vehicles/server/delete'
 import { vehicleTypeLabel } from '@/features/vehicles/lib/vehicle-type'
 import type { VehicleType } from '@/features/vehicles/lib/vehicle-type'
@@ -34,10 +35,12 @@ function toFilterable(row: MaintenanceRecordRow) {
     id: row.id,
     vehicleId: row.vehicle_id,
     workType: row.work_type as WorkType,
-    workTypeOther: row.work_type_other,
+    detail: row.detail,
     performedOn: toDateString(row.performed_on),
     odometerKm: row.odometer_km,
     partDetail: row.part_detail,
+    oilType: row.oil_type,
+    elementChanged: row.element_changed,
   }
 }
 
@@ -100,87 +103,161 @@ function VehicleDetailPage() {
     shakenTier === 'none' ? null : shakenTierMessage(shakenTier, daysUntilExpiry(shakenExpiryDate, todayInJst()))
 
   return (
-    <main>
-      <h1>{vehicle.name}</h1>
-      <p>車両区分: {vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}</p>
-      <p>
-        車検満了日: {shakenExpiryDate ? formatJa(shakenExpiryDate) : '車検対象外'}
-      </p>
-      {shakenRequired(shakenExpiryDate) && (
-        <section>
-          {shakenMessage && <p role={shakenTier === 'warning' ? 'status' : 'alert'}>{shakenMessage}</p>}
-          <p>
-            <Link to="/vehicles/$vehicleId/shaken" params={{ vehicleId: vehicle.id }}>
-              車検完了を記録
-            </Link>
-          </p>
-        </section>
-      )}
-      {vehicle.note && <p>備考: {vehicle.note}</p>}
-      <p>
-        <Link to="/vehicles/$vehicleId/edit" params={{ vehicleId: vehicle.id }}>
-          編集
-        </Link>
-      </p>
-      <button type="button" onClick={handleDeleteVehicle} disabled={deletingVehicle}>
-        削除
-      </button>
-      {deleteVehicleError && <p role="alert">{deleteVehicleError}</p>}
-
-      <section>
-        <h2>整備記録</h2>
-        <p>
-          <Link to="/vehicles/$vehicleId/records/new" params={{ vehicleId: vehicle.id }}>
-            ＋ 整備記録を追加
-          </Link>
-        </p>
-        <label>
-          作業内容で絞り込み
-          <select
-            value={workTypeFilter}
-            onChange={(event) => setWorkTypeFilter(event.target.value as WorkType | 'all')}
+    <>
+      <PageHeader
+        title={vehicle.name}
+        actions={
+          <Link
+            to="/vehicles/$vehicleId/records/new"
+            params={{ vehicleId: vehicle.id }}
+            className="btn btn-primary"
           >
-            <option value="all">すべて</option>
-            {WORK_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {workTypeLabel(type)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {visibleRecords.length === 0 ? (
-          <p>整備記録はまだありません。</p>
-        ) : (
-          <ul>
-            {visibleRecords.map((record) => (
-              <li key={record.id}>
-                {formatJa(record.performedOn)}・
-                {record.workType === 'other' ? record.workTypeOther : workTypeLabel(record.workType)}
-                {record.odometerKm != null && `・${record.odometerKm}km`}
-                {record.partDetail && `・${record.partDetail}`}{' '}
+            整備を記録
+          </Link>
+        }
+      />
+
+      <section className="section section-compact section-light">
+        <div className="container container-reading stack">
+          <div className="card">
+            <div className="card-meta">
+              <span>
+                <span className="card-meta-label">車両区分 </span>
+                {vehicleTypeLabel(vehicle.vehicle_type as VehicleType)}
+              </span>
+              {vehicle.model_code && (
+                <span>
+                  <span className="card-meta-label">型式 </span>
+                  {vehicle.model_code}
+                </span>
+              )}
+              <span>
+                <span className="card-meta-label">車検満了日 </span>
+                {shakenExpiryDate ? formatJa(shakenExpiryDate) : '車検対象外'}
+              </span>
+            </div>
+            {vehicle.note && <p>{vehicle.note}</p>}
+            {shakenRequired(shakenExpiryDate) && shakenMessage && (
+              <p
+                role={shakenTier === 'warning' ? 'status' : 'alert'}
+                className={`card-alert ${shakenTier === 'warning' ? 'card-alert-warning' : 'card-alert-danger'}`}
+              >
+                {shakenMessage}
+              </p>
+            )}
+            <div className="card-actions">
+              {shakenRequired(shakenExpiryDate) && (
                 <Link
-                  to="/vehicles/$vehicleId/records/$recordId/edit"
-                  params={{ vehicleId: vehicle.id, recordId: record.id }}
+                  to="/vehicles/$vehicleId/records/new"
+                  params={{ vehicleId: vehicle.id }}
+                  search={{ workType: 'shaken' }}
+                  className="btn btn-secondary"
                 >
-                  編集
-                </Link>{' '}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteRecord(record.id)}
-                  disabled={deletingRecordId === record.id}
-                >
-                  削除
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {deleteRecordError && <p role="alert">{deleteRecordError}</p>}
+                  車検完了を記録
+                </Link>
+              )}
+              <Link
+                to="/vehicles/$vehicleId/edit"
+                params={{ vehicleId: vehicle.id }}
+                className="btn btn-pearl"
+              >
+                編集
+              </Link>
+              <button type="button" className="btn btn-pearl" onClick={handleDeleteVehicle} disabled={deletingVehicle}>
+                削除
+              </button>
+            </div>
+            {deleteVehicleError && (
+              <p role="alert" className="alert">
+                {deleteVehicleError}
+              </p>
+            )}
+          </div>
+        </div>
       </section>
 
-      <p>
-        <Link to="/vehicles">車両一覧へ戻る</Link>
-      </p>
-    </main>
+      <section className="section section-compact">
+        <div className="container container-reading stack">
+          <div className="section-head">
+            <h2>整備記録</h2>
+          </div>
+
+          <label className="field field-compact">
+            <span className="field-label">作業内容で絞り込み</span>
+            <select
+              className="field-select"
+              value={workTypeFilter}
+              onChange={(event) => setWorkTypeFilter(event.target.value as WorkType | 'all')}
+            >
+              <option value="all">すべて</option>
+              {WORK_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {workTypeLabel(type)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {visibleRecords.length === 0 ? (
+            <div className="empty-state">
+              <p>整備記録はまだありません。</p>
+              <Link
+                to="/vehicles/$vehicleId/records/new"
+                params={{ vehicleId: vehicle.id }}
+                className="btn btn-primary"
+              >
+                最初の記録を追加
+              </Link>
+            </div>
+          ) : (
+            <ul className="card">
+              {visibleRecords.map((record) => (
+                <li key={record.id} className="list-row">
+                  <span className="list-row-primary">{formatJa(record.performedOn)}</span>
+                  <span>{workTypeLabel(record.workType)}</span>
+                  <span className="list-row-meta">
+                    {[
+                      record.detail,
+                      record.oilType,
+                      record.elementChanged ? 'エレメント交換' : '',
+                      record.partDetail,
+                      record.odometerKm != null ? `${record.odometerKm.toLocaleString()}km` : '',
+                    ]
+                      .filter(Boolean)
+                      .join('・')}
+                  </span>
+                  <span className="card-actions">
+                    <Link
+                      to="/vehicles/$vehicleId/records/$recordId/edit"
+                      params={{ vehicleId: vehicle.id, recordId: record.id }}
+                      className="btn btn-pearl"
+                    >
+                      編集
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn-pearl"
+                      onClick={() => handleDeleteRecord(record.id)}
+                      disabled={deletingRecordId === record.id}
+                    >
+                      削除
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {deleteRecordError && (
+            <p role="alert" className="alert">
+              {deleteRecordError}
+            </p>
+          )}
+
+          <p>
+            <Link to="/vehicles">車両一覧へ戻る</Link>
+          </p>
+        </div>
+      </section>
+    </>
   )
 }

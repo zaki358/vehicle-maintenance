@@ -1,0 +1,99 @@
+/*
+ * 上部の2段ナビ（design.md の Top Navigation）。
+ * 1段目は 44px の真っ黒なバー、2段目はすりガラスのサブナビ。
+ * リンクが3つだけなのでハンバーガーには畳まず、狭い画面では文字を詰めて収める。
+ */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  min-height: var(--nav-height);
+  padding: 0 var(--space-lg);
+  background: var(--surface-black);
+  color: var(--body-on-dark);
+}
+
+.nav-brand {
+  color: var(--body-on-dark);
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caption);
+  white-space: nowrap;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-left: auto;
+}
+
+.nav-link {
+  color: var(--body-on-dark);
+  font-size: var(--text-fine-size);
+  letter-spacing: var(--tracking-fine);
+  white-space: nowrap;
+}
+
+.nav-brand:hover,
+.nav-link:hover {
+  text-decoration: underline;
+}
+
+/* サブナビ: 左にページ名、右にそのページの主要アクション */
+.sub-nav {
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--sub-nav-height);
+  padding: var(--space-xs) var(--space-lg);
+  border-bottom: 1px solid var(--hairline-soft);
+  background: rgba(245, 245, 247, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.sub-nav-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-tagline-size);
+  font-weight: 600;
+  line-height: var(--leading-tagline);
+  letter-spacing: 0.231px;
+}
+
+.sub-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+/* 戻る導線はサブナビの上に小さく置く */
+.sub-nav-back {
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--tracking-caption);
+}
+
+@media (max-width: 480px) {
+  .nav,
+  .sub-nav {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+
+  .nav-links {
+    gap: var(--space-sm);
+  }
+
+  .sub-nav-title {
+    font-size: var(--text-body-size);
+  }
+}

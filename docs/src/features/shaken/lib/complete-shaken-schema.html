@@ -17,18 +17,23 @@
   <section class="doc-section">
     <h2>概要</h2>
     <p>
-      車検完了フォームの入力を検証する Zod スキーマです。受検日・新しい満了日・
-      走行距離・部品/型式・備考の5項目を持ち、整備記録の登録フォーム用
-      <code>maintenance/lib/record-schema.ts</code> と似ていますが、
-      「作業内容（<code>workType</code>）」を持たない点が異なります
-      （車検完了は常に <code>work_type = 'shaken'</code> で固定のため）。
+      車検完了の入力を検証する Zod スキーマです。作業日・新しい満了日・走行距離・
+      備考の4項目だけを持ちます。
     </p>
     <p>
-      「新しい満了日」を検証はしても、受検日との前後関係までは強制しない設計です。
-      この値は <code>renewal.ts</code> の <code>computeNextShakenExpiry</code> が
-      自動計算した提案値であり、利用者が画面上で手動修正できる仕様
-      （要件「計算結果を表示し手動修正も可」）のため、業務ルールをここで
-      サーバー側から強制すると手動修正そのものを塞いでしまいます。
+      以前はこのスキーマ専用の画面（<code>complete-shaken-form.tsx</code> と
+      <code>/vehicles/$vehicleId/shaken</code> ルート）がありましたが、現在は削除され、
+      <strong>整備記録フォーム（<code>record-form.tsx</code>）の中で作業内容に
+      「車検」を選んだとき</strong>にこのスキーマが使われます。車検は整備記録の追加と
+      車両の満了日更新を1トランザクションで行う必要があるため、通常の
+      <code>recordSchema</code> とは別経路（<code>complete_shaken</code> RPC）を通り、
+      検証スキーマもこちらに切り替わります。
+    </p>
+    <p>
+      車検の行は区分名そのものが作業内容を表すため、<code>detail</code> も
+      <code>part_detail</code> も <code>oil_type</code> も使いません。
+      このスキーマに項目が少ないのはそのためで、<code>workTypeFields('shaken')</code> が
+      すべて <code>hidden</code> / <code>false</code> を返すことと対応しています。
     </p>
   </section>
 
@@ -39,8 +44,9 @@
         <tr><th>名前</th><th>種別</th><th>説明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>completeShakenSchema</code></td><td>const（export）</td><td>車検完了フォームの入力を検証する Zod スキーマ</td></tr>
-        <tr><td><code>CompleteShakenInput</code></td><td>type（export）</td><td><code>completeShakenSchema</code> から推論した入力型</td></tr>
+        <tr><td><code>NOTE_MAX_LENGTH</code></td><td>const（非export）</td><td>備考の最大文字数（1000）</td></tr>
+        <tr><td><code>completeShakenSchema</code></td><td>Zod スキーマ（export）</td><td>車検完了入力の検証定義</td></tr>
+        <tr><td><code>CompleteShakenInput</code></td><td>type（export）</td><td><code>z.infer</code> による入力型</td></tr>
       </tbody>
     </table>
   </section>
@@ -52,33 +58,66 @@
       <pre><code>export const completeShakenSchema = z.object({
   performedOn: dateStringSchema,
   newExpiryDate: dateStringSchema,
-  odometerKm: z
+  ...
+})</code></pre>
+      <p>
+        <code>performedOn</code> は車検を受けた日、<code>newExpiryDate</code> は
+        更新後の満了日です。どちらも <code>dateStringSchema</code> による
+        branded な <code>DateString</code> で、<code>Date</code> には変換しません。
+        Cloudflare Workers は常に <code>TZ=UTC</code> で動くため、日付を
+        <code>Date</code> 経由で扱うと利用者の JST と1日ずれる恐れがあります。
+      </p>
+      <p>
+        <strong>2つの日付の前後関係を検証していないのが意図的な判断</strong>です。
+        <code>newExpiryDate</code> は <code>renewal.ts</code> の
+        <code>computeNextShakenExpiry</code> が算出した提案値を画面に表示し、
+        利用者が手で修正できる前提のフィールドです。制度どおりの計算と実際の
+        満了日が一致しない場合がありうるため、ここでは「実在する日付か」だけを
+        確かめ、それ以上の制約はかけません。計算結果はあくまで提案、というのが
+        このアプリの方針です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  odometerKm: z
     .number()
     .int('走行距離は整数で入力してください')
     .nonnegative('走行距離は0以上で入力してください')
     .nullable()
-    .default(null),
-  partDetail: z.string().trim().max(PART_DETAIL_MAX_LENGTH, ...).default(''),
-  note: z.string().trim().max(NOTE_MAX_LENGTH, ...).default(''),
-})</code></pre>
+    .default(null),</code></pre>
       <p>
-        <code>performedOn</code>（受検日）と <code>newExpiryDate</code>（新しい満了日）は、
-        どちらも共有スキーマ <code>lib/date/date-string-schema.ts</code> の
-        <code>dateStringSchema</code> を使い、「実在する <code>YYYY-MM-DD</code> か」だけを検証します。
+        <code>recordSchema</code> の同名フィールドと同じ定義です。
+        <code>null</code> はエラーではなく「走行距離を記録しなかった」という
+        正常値として扱います。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>  note: z
+    .string()
+    .trim()
+    .max(NOTE_MAX_LENGTH, `備考は${NOTE_MAX_LENGTH}文字以内で入力してください`)
+    .default(''),
+})
+
+export type CompleteShakenInput = z.infer&lt;typeof completeShakenSchema&gt;</code></pre>
+      <p>
+        備考も他のスキーマと同じ扱いで、未入力は <code>null</code> ではなく空文字です
+        （DB 側の <code>note</code> 列も <code>not null default ''</code>）。
       </p>
       <p>
-        <code>odometerKm</code>・<code>partDetail</code>・<code>note</code> は
-        <code>record-schema.ts</code> の同名フィールドと検証ルール（整数・0以上・最大文字数・trim）が
-        同一です。異なるテーブル操作用のスキーマを意図的に分けているため、
-        定数（最大文字数）も含めてこのファイル内で完結させています
-        （3〜4行程度の重複であれば、無理に共通化して2つの機能をカップリングさせない方針）。
+        <code>CompleteShakenInput</code> は <code>record-form.tsx</code> の
+        <code>shakenRenewal.onSubmit</code> の引数型として使われ、そこから
+        <code>features/shaken/server/complete-shaken.ts</code> のサーバー関数へ渡ります。
+        サーバー関数は同じスキーマを <code>.validator()</code> に指定しているため、
+        画面を迂回した直接リクエストでも同じ検証が働きます。
       </p>
     </div>
 
   </section>
 
   <footer class="doc-footer">
-    生成日: 2026-09-19 ／ 対象ファイル: src/features/shaken/lib/complete-shaken-schema.ts
+    生成日: 2026-09-20 ／ 対象ファイル: src/features/shaken/lib/complete-shaken-schema.ts
   </footer>
 
 </div>

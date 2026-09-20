@@ -1,5 +1,6 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
 
+import { AppNav } from '@/components/app-nav'
 import { requireUser } from '@/features/auth/require-user'
 import { getSessionFn } from '@/features/auth/server/get-session'
 
@@ -19,5 +20,14 @@ export const Route = createFileRoute('/_authed')({
     const user = await getSessionFn()
     return { user: requireUser(user, location.href) }
   },
-  component: () => <Outlet />,
+  component: AuthedLayout,
 })
+
+function AuthedLayout() {
+  return (
+    <div className="page">
+      <AppNav />
+      <Outlet />
+    </div>
+  )
+}

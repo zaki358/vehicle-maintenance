@@ -1,16 +1,12 @@
+/*
+ * アプリ全体のスタイルの入口。実体は styles/ 以下に分割してある。
+ * 読み込み順に意味がある: トークン → 地の文 → 部品。
+ */
 
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-}
-
-main {
-  width: min(42rem, calc(100% - 2rem));
-  margin: 4rem auto;
-}
-
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/layout.css';
+@import './styles/nav.css';
+@import './styles/buttons.css';
+@import './styles/forms.css';
+@import './styles/cards.css';

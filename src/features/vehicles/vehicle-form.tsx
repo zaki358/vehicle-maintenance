@@ -28,6 +28,7 @@ interface VehicleFormProps {
  */
 export function VehicleForm({ initialValues, submitLabel, onSubmit }: VehicleFormProps) {
   const [name, setName] = useState(initialValues?.name ?? '')
+  const [modelCode, setModelCode] = useState(initialValues?.modelCode ?? '')
   const [vehicleType, setVehicleType] = useState<VehicleType>(initialValues?.vehicleType ?? 'car')
   const [shakenExpiryDate, setShakenExpiryDate] = useState(initialValues?.shakenExpiryDate ?? '')
   const [note, setNote] = useState(initialValues?.note ?? '')
@@ -39,6 +40,7 @@ export function VehicleForm({ initialValues, submitLabel, onSubmit }: VehicleFor
 
     const parsed = vehicleSchema.safeParse({
       name,
+      modelCode,
       vehicleType,
       shakenExpiryDate: shakenExpiryDate === '' ? null : shakenExpiryDate,
       note,
@@ -61,33 +63,60 @@ export function VehicleForm({ initialValues, submitLabel, onSubmit }: VehicleFor
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        車種名
-        <input value={name} onChange={(event) => setName(event.target.value)} />
+    <form onSubmit={handleSubmit} className="form-stack">
+      <label className="field">
+        <span className="field-label">車種名</span>
+        <input className="field-input" value={name} onChange={(event) => setName(event.target.value)} />
       </label>
-      <label>
-        車両区分
-        <select value={vehicleType} onChange={(event) => setVehicleType(event.target.value as VehicleType)}>
-          {VEHICLE_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {vehicleTypeLabel(type)}
-            </option>
-          ))}
-        </select>
+      <div className="field">
+        <label className="field-control">
+          <span className="field-label">型式</span>
+          <input className="field-input" value={modelCode} onChange={(event) => setModelCode(event.target.value)} />
+        </label>
+        <span className="field-hint">任意。例: ZC33S</span>
+      </div>
+      <div className="form-grid form-grid-2">
+        <label className="field">
+          <span className="field-label">車両区分</span>
+          <select
+            className="field-select"
+            value={vehicleType}
+            onChange={(event) => setVehicleType(event.target.value as VehicleType)}
+          >
+            {VEHICLE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {vehicleTypeLabel(type)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="field">
+          <label className="field-control">
+            <span className="field-label">車検満了日</span>
+            <input
+              type="date"
+              className="field-input"
+              value={shakenExpiryDate}
+              onChange={(event) => setShakenExpiryDate(event.target.value)}
+            />
+          </label>
+          <span className="field-hint">任意。250cc以下のバイクなど車検が無い車両は空欄</span>
+        </div>
+      </div>
+      <label className="field">
+        <span className="field-label">備考</span>
+        <textarea className="field-textarea" value={note} onChange={(event) => setNote(event.target.value)} />
       </label>
-      <label>
-        車検満了日（任意）
-        <input type="date" value={shakenExpiryDate} onChange={(event) => setShakenExpiryDate(event.target.value)} />
-      </label>
-      <label>
-        備考
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={submitting}>
-        {submitLabel}
-      </button>
+      {error && (
+        <p role="alert" className="alert">
+          {error}
+        </p>
+      )}
+      <div className="btn-row">
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitLabel}
+        </button>
+      </div>
     </form>
   )
 }

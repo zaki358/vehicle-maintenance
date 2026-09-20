@@ -1,5 +1,7 @@
 import { Link, createFileRoute, notFound, useNavigate } from '@tanstack/react-router'
 
+import { PageHeader } from '@/components/page-header'
+
 import { updateRecordFn } from '@/features/maintenance/server/update'
 import { listPartDetailsFn } from '@/features/maintenance/server/list-part-details'
 import { listRecordsFn } from '@/features/maintenance/server/list'
@@ -37,14 +39,16 @@ export const Route = createFileRoute('/_authed/vehicles/$vehicleId/records/$reco
 function RecordNotFound() {
   const { vehicle } = Route.useRouteContext()
   return (
-    <main>
-      <h1>整備記録が見つかりません</h1>
-      <p>指定された整備記録は存在しないか、閲覧できません。</p>
-      <p>
-        <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}>
-          車両詳細へ戻る
-        </Link>
-      </p>
+    <main className="section section-compact">
+      <div className="container container-narrow">
+        <div className="empty-state">
+          <h1>整備記録が見つかりません</h1>
+          <p>指定された整備記録は存在しないか、閲覧できません。</p>
+          <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }} className="btn btn-secondary">
+            車両詳細へ戻る
+          </Link>
+        </div>
+      </div>
     </main>
   )
 }
@@ -57,9 +61,11 @@ function EditRecordPage() {
   const initialValues: RecordInput = {
     performedOn: toDateString(record.performed_on),
     workType: record.work_type as WorkType,
-    workTypeOther: record.work_type_other,
+    detail: record.detail,
     odometerKm: record.odometer_km,
     partDetail: record.part_detail,
+    oilType: record.oil_type,
+    elementChanged: record.element_changed,
     note: record.note,
   }
 
@@ -85,20 +91,27 @@ function EditRecordPage() {
   }
 
   return (
-    <main>
-      <h1>整備記録を編集</h1>
-      <RecordForm
-        submitLabel="更新"
-        initialValues={initialValues}
-        partSuggestionsList={partSuggestionsList}
-        existingReadings={existingReadings}
-        onSubmit={handleSubmit}
-      />
-      <p>
-        <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}>
-          キャンセルして詳細へ戻る
-        </Link>
-      </p>
-    </main>
+    <>
+      <PageHeader title="整備記録を編集" />
+      <main className="section section-compact">
+        <div className="container container-narrow stack">
+          <div className="card">
+            <p className="card-meta">{vehicle.name}</p>
+            <RecordForm
+              submitLabel="更新"
+              initialValues={initialValues}
+              partSuggestionsList={partSuggestionsList}
+              existingReadings={existingReadings}
+              onSubmit={handleSubmit}
+            />
+          </div>
+          <p>
+            <Link to="/vehicles/$vehicleId" params={{ vehicleId: vehicle.id }}>
+              キャンセルして詳細へ戻る
+            </Link>
+          </p>
+        </div>
+      </main>
+    </>
   )
 }

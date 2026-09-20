@@ -41,42 +41,44 @@ test.describe('整備記録', () => {
     await gotoReady(page, `/vehicles/${vehicleId}`)
   })
 
-  test('記録を追加すると一覧に反映され、部品/型式がサジェストされ、作業内容フィルタが機能する', async ({
+  test('記録を追加すると一覧に反映され、部品型式がサジェストされ、作業内容フィルタが機能する', async ({
     page,
   }) => {
-    await page.getByRole('link', { name: '＋ 整備記録を追加' }).click()
+    await page.getByRole('link', { name: '整備を記録' }).click()
     await page.getByLabel('実施日').fill('2026-05-01')
-    await page.getByLabel('作業内容').selectOption('engine_oil')
-    await page.getByLabel('部品/型式').fill('純正オイルXYZ')
+    await page.getByLabel('作業内容').selectOption('part')
+    await page.getByLabel('交換内容').fill('ブレーキパッド')
+    await page.getByLabel('部品型式').fill('純正パッドXYZ')
     await page.getByRole('button', { name: '登録' }).click()
 
     await expect(page).toHaveURL(`/vehicles/${vehicleId}`)
-    await expect(page.getByText('純正オイルXYZ')).toBeVisible()
+    await expect(page.getByText('純正パッドXYZ')).toBeVisible()
 
-    // 2件目を登録する前に、1件目の部品/型式がdatalistでサジェストされることを確認する
-    await page.getByRole('link', { name: '＋ 整備記録を追加' }).click()
+    // 2件目を登録する前に、1件目の部品型式がdatalistでサジェストされることを確認する
+    await page.getByRole('link', { name: '整備を記録' }).click()
     const suggestion = page.locator(
-      'datalist#record-form-part-detail-suggestions option[value="純正オイルXYZ"]',
+      'datalist#record-form-part-detail-suggestions option[value="純正パッドXYZ"]',
     )
     await expect(suggestion).toHaveCount(1)
 
+    // エンジンオイルは部品型式を持たず、代わりに油種を入力する区分
     await page.getByLabel('実施日').fill('2026-06-01')
-    await page.getByLabel('作業内容').selectOption('tire')
-    await page.getByLabel('部品/型式').fill('タイヤABC')
+    await page.getByLabel('作業内容').selectOption('engine_oil')
+    await page.getByLabel('油種').fill('0W-20指定')
     await page.getByRole('button', { name: '登録' }).click()
 
     await expect(page).toHaveURL(`/vehicles/${vehicleId}`)
-    await expect(page.getByText('純正オイルXYZ')).toBeVisible()
-    await expect(page.getByText('タイヤABC')).toBeVisible()
+    await expect(page.getByText('純正パッドXYZ')).toBeVisible()
+    await expect(page.getByText('0W-20指定')).toBeVisible()
 
-    // 作業内容フィルタ: タイヤだけに絞り込む
-    await page.getByLabel('作業内容で絞り込み').selectOption('tire')
-    await expect(page.getByText('タイヤABC')).toBeVisible()
-    await expect(page.getByText('純正オイルXYZ')).toHaveCount(0)
+    // 作業内容フィルタ: エンジンオイルだけに絞り込む
+    await page.getByLabel('作業内容で絞り込み').selectOption('engine_oil')
+    await expect(page.getByText('0W-20指定')).toBeVisible()
+    await expect(page.getByText('純正パッドXYZ')).toHaveCount(0)
 
     // フィルタを解除するとどちらも表示される
     await page.getByLabel('作業内容で絞り込み').selectOption('all')
-    await expect(page.getByText('純正オイルXYZ')).toBeVisible()
-    await expect(page.getByText('タイヤABC')).toBeVisible()
+    await expect(page.getByText('純正パッドXYZ')).toBeVisible()
+    await expect(page.getByText('0W-20指定')).toBeVisible()
   })
 })

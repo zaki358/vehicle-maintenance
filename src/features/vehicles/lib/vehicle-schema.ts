@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { dateStringSchema } from '@/lib/date/date-string-schema'
 
 const NAME_MAX_LENGTH = 50
+const MODEL_CODE_MAX_LENGTH = 50
 const NOTE_MAX_LENGTH = 1000
 
 /**
@@ -17,6 +18,11 @@ export const vehicleSchema = z.object({
     .trim()
     .min(1, '車種名を入力してください')
     .max(NAME_MAX_LENGTH, `車種名は${NAME_MAX_LENGTH}文字以内で入力してください`),
+  modelCode: z
+    .string()
+    .trim()
+    .max(MODEL_CODE_MAX_LENGTH, `型式は${MODEL_CODE_MAX_LENGTH}文字以内で入力してください`)
+    .default(''),
   vehicleType: z.enum(['car', 'motorcycle'], { error: '車両区分を選択してください' }),
   shakenExpiryDate: dateStringSchema.nullable(),
   note: z

@@ -11,7 +11,7 @@ describe('createVehicleHandler', () => {
     const from = vi.fn().mockReturnValue({ insert })
 
     const result = await createVehicleHandler(
-      { name: '愛車', vehicleType: 'car', shakenExpiryDate: '2027-01-01' as never, note: '' },
+      { name: '愛車', modelCode: 'ZC33S', vehicleType: 'car', shakenExpiryDate: '2027-01-01' as never, note: '' },
       { supabase: { from } },
     )
 
@@ -19,6 +19,7 @@ describe('createVehicleHandler', () => {
     expect(from).toHaveBeenCalledWith('vehicles')
     expect(insert).toHaveBeenCalledWith({
       name: '愛車',
+      model_code: 'ZC33S',
       vehicle_type: 'car',
       shaken_expiry_date: '2027-01-01',
       note: '',
@@ -33,7 +34,7 @@ describe('createVehicleHandler', () => {
 
     await expect(
       createVehicleHandler(
-        { name: '愛車', vehicleType: 'car', shakenExpiryDate: null, note: '' },
+        { name: '愛車', modelCode: '', vehicleType: 'car', shakenExpiryDate: null, note: '' },
         { supabase: { from } },
       ),
     ).rejects.toThrow('boom')

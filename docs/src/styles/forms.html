@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>forms.css</title>
+<link rel="stylesheet" href="../../assets/doc-style.css">
+</head>
+<body>
+<div class="doc-container">
+
+  <header class="doc-header">
+    <h1>forms.css</h1>
+    <div class="doc-path">src/styles/forms.css</div>
+  </header>
+
+  <section class="doc-section">
+    <h2>概要</h2>
+    <p>
+      入力フォームのスタイルです。ラベル・入力欄・補足文・エラー表示・
+      入力群のレイアウトをまとめています。
+    </p>
+    <p>
+      <strong>design.md はフォームの状態を定義していません</strong>
+      （仕様書の Known Gaps に挙げられています）。参照元が製品紹介ページ中心で、
+      入力フォームがほとんど登場しないためです。そこでこのファイルは、
+      記録アプリに必要な分だけを<strong>既存の文法の内側で</strong>決めています:
+      ラベルは caption-strong、入力欄は Pearl カプセルと同じ 11px 角丸、
+      高さは最小タッチターゲット 44px、フォーカスは既存の青いリング。
+      新しい色やサイズは一切足していません。
+    </p>
+  </section>
+
+  <section class="doc-section">
+    <h2>構成</h2>
+    <table class="doc-structure">
+      <thead>
+        <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>.field</code></td><td>クラス</td><td>1入力項目のまとまり</td></tr>
+        <tr><td><code>.field-control</code></td><td>クラス</td><td>補足文を label の外に置くための入れ物</td></tr>
+        <tr><td><code>.field-label</code> / <code>.field-hint</code></td><td>クラス</td><td>ラベルと補足文</td></tr>
+        <tr><td><code>.field-input / -select / -textarea</code></td><td>クラス</td><td>入力欄本体</td></tr>
+        <tr><td><code>.field-compact</code></td><td>修飾クラス</td><td>絞り込みなど単独入力の幅制限</td></tr>
+        <tr><td><code>.field-check</code></td><td>クラス</td><td>チェックボックス行</td></tr>
+        <tr><td><code>.form-stack</code> / <code>.form-grid</code></td><td>クラス</td><td>入力群の縦積み／グリッド</td></tr>
+        <tr><td><code>.alert</code></td><td>クラス</td><td>エラー表示（暗いタイル）</td></tr>
+        <tr><td><code>.notice</code></td><td>クラス</td><td>注意喚起未満の補助メッセージ</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <h2>コード解説</h2>
+
+    <div class="doc-chunk">
+      <pre><code>.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+/*
+ * 補足文（.field-hint）を &lt;label&gt; の外に置くための入れ物。
+ * label の中に入れると読み上げ時にラベル名の一部として読まれてしまう。
+ */
+.field-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}</code></pre>
+      <p>
+        <strong>このファイルで最も重要な設計判断です。</strong>
+        補足文を <code>&lt;label&gt;</code> の内側に書くと、その文言が
+        <strong>アクセシブルネーム（読み上げ名）の一部</strong>になります。
+        たとえば「走行距離」というラベルに「半角数字で入力してください」という
+        補足を入れ子にすると、スクリーンリーダーはフィールド名を
+        「走行距離 半角数字で入力してください」と読み上げてしまい、
+        フォーム内を項目名で拾い読みするのが難しくなります。
+      </p>
+      <p>
+        そこで <code>&lt;label&gt;</code> には短いラベル文言だけを入れ、
+        補足文は label の兄弟要素として <code>.field-control</code> の中に置きます。
+        見た目の積み上げ（ラベル → 補足 → 入力欄）は
+        <code>.field</code> と <code>.field-control</code> の2段フレックスで作るため、
+        マークアップの正しさと見た目の両方が成立します。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.field-label {
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  line-height: 1.29;
+  letter-spacing: var(--tracking-caption);
+  color: var(--ink);
+}
+
+.field-hint {
+  font-size: var(--text-fine-size);
+  letter-spacing: var(--tracking-fine);
+  color: var(--ink-muted-48);
+}</code></pre>
+      <p>
+        ラベルは 14px の太字（caption-strong）で、本文より小さくしつつ
+        太さで存在感を出します。補足文はさらに小さい 12px、色も
+        <code>--ink-muted-48</code> に落として階層を作ります。
+        <strong>色で目立たせる</strong>のではなく、サイズ・太さ・明度だけで
+        3段階（ラベル → 入力内容 → 補足）を区別しているのが要点です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 12px 16px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: var(--text-body-size);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+}
+
+.field-textarea {
+  min-height: 96px;
+  resize: vertical;
+}</code></pre>
+      <p>
+        3種類の入力欄を同じ寸法・同じ角丸（11px = Pearl カプセルと同値）に
+        揃えています。これにより <code>&lt;select&gt;</code> だけ見た目が浮く、
+        といったズレが起きません。
+      </p>
+      <p>
+        <code>font-size</code> が本文と同じ <strong>17px</strong> であることには
+        実用上の意味があります。iOS Safari は 16px 未満の入力欄にフォーカスすると
+        画面を自動でズームするため、16px 以上にしておくと
+        タップのたびに拡大される不快な挙動を避けられます。
+      </p>
+      <p>
+        <code>resize: vertical</code> は、テキストエリアを横方向に広げて
+        レイアウトを壊されるのを防ぎつつ、縦方向の調整は利用者に許す設定です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.field-input:focus-visible,
+.field-select:focus-visible,
+.field-textarea:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 0;
+  border-color: transparent;
+}</code></pre>
+      <p>
+        <code>base.css</code> の共通フォーカスリングは <code>outline-offset: 2px</code>
+        ですが、入力欄では 0 に戻します。枠線を持つ要素で外側に離すと、
+        既存の枠とリングが二重の輪に見えてしまうためです。
+      </p>
+      <p>
+        さらに <code>border-color: transparent</code> で元の枠線を透明にし、
+        青いリングだけが見えるようにします。<code>border</code> 自体は
+        残っているので要素の寸法は変わらず、フォーカスした瞬間に
+        入力欄が数ピクセル動く（レイアウトシフト）ことがありません。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 絞り込みなど、単独で置く入力は横幅を広げすぎない */
+.field-compact {
+  max-width: 320px;
+}
+
+/* チェックボックスは行全体を押せるようにする */
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+  font-size: var(--text-body-size);
+}
+
+.field-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+}</code></pre>
+      <p>
+        チェックボックス行は <code>&lt;label&gt;</code> として書かれる想定で、
+        <code>min-height: 44px</code> を与えることで、小さな四角そのものではなく
+        <strong>行全体がタップ領域</strong>になります。20px のチェックボックスを
+        指で正確に押すのは難しいため、これが実際の押しやすさを決めます。
+      </p>
+      <p>
+        <code>accent-color</code> はブラウザ標準のチェックボックスの
+        チェック色だけを差し替えるプロパティです。見た目を自前で作り直すと
+        キーボード操作や読み上げの挙動まで再実装する必要が出るため、
+        標準部品のまま色だけ合わせる方が安全です。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* 狭い画面では1列、広い画面では2列に流す入力群 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+}
+
+@media (min-width: 641px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}</code></pre>
+      <p>
+        <code>.form-grid</code> は既定が1列で、<code>min-width</code> の
+        メディアクエリで2列に<strong>広げる</strong>形です。狭い画面を出発点に
+        する（モバイルファースト）ことで、メディアクエリが効かない環境でも
+        必ず1列という安全側に倒れます。
+      </p>
+      <p>
+        2列化は <code>.form-grid-2</code> を併記したときだけ起こるので、
+        「年式と型式は横並び、備考は全幅」といった使い分けができます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 入力エラー。色を増やさず、太字＋ダークタイルで注意を示す */
+.alert {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-tile-1);
+  color: var(--body-on-dark);
+  font-size: var(--text-caption-size);
+  ...
+}
+
+.alert a { color: var(--color-primary-on-dark); }</code></pre>
+      <p>
+        <strong>エラーが赤くない理由</strong> — design.md は
+        「第2のアクセント色を導入してはならない。押せる合図はすべて青」と
+        定めており、赤を足すことはその禁止に触れます。代わりに
+        <strong>暗いタイル</strong>を使い、周囲の明るい面との明度差で
+        視線を引きます。色覚に依存しない手掛かりなので、
+        アクセシビリティの観点でもむしろ有利です。
+      </p>
+      <p>
+        暗い面の上に置くリンクは <code>--color-primary-on-dark</code>
+        （明るい青）へ差し替えます。通常の <code>#0066cc</code> のままだと
+        コントラストが不足するためです。
+      </p>
+      <p>
+        このクラスは <code>AppNav</code> のログアウト失敗メッセージや、
+        各フォームの検証エラーで使われ、いずれも <code>role="alert"</code> を
+        付けた要素に当てられます。
+      </p>
+    </div>
+
+    <div class="doc-chunk">
+      <pre><code>/* 注意喚起までは要らない補助メッセージ（走行距離の逆行警告など） */
+.notice {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-pearl);
+  color: var(--ink-muted-80);
+  ...
+}</code></pre>
+      <p>
+        エラーではないが伝えたい情報のための、明るく静かな箱です。
+        たとえば「前回より走行距離が減っています」のような、
+        入力を止めるほどではない指摘に使います。
+        <code>.alert</code>（暗い）と <code>.notice</code>（明るい）という
+        面の明暗だけで深刻度の2段階を表現しており、ここでも色は増やしていません。
+      </p>
+    </div>
+
+  </section>
+
+  <footer class="doc-footer">
+    生成日: 2026-09-20 ／ 対象ファイル: src/styles/forms.css
+  </footer>
+
+</div>
+</body>
+</html>

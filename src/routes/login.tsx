@@ -53,34 +53,47 @@ function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>ログイン</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          メールアドレス
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          パスワード
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          ログイン
-        </button>
-      </form>
+    <main className="page">
+      <section className="section section-compact">
+        <div className="card card-centered">
+          <div className="stack-tight">
+            <h1>ログイン</h1>
+            <p className="field-hint">車両メンテナンス記録</p>
+          </div>
+          <form onSubmit={handleSubmit} className="form-stack">
+            <label className="field">
+              <span className="field-label">メールアドレス</span>
+              <input
+                type="email"
+                className="field-input"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">パスワード</span>
+              <input
+                type="password"
+                className="field-input"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            {error && (
+              <p role="alert" className="alert">
+                {error}
+              </p>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              ログイン
+            </button>
+          </form>
+        </div>
+      </section>
     </main>
   )
 }

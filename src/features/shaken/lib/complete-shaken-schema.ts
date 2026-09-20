@@ -2,7 +2,6 @@ import { z } from 'zod'
 
 import { dateStringSchema } from '@/lib/date/date-string-schema'
 
-const PART_DETAIL_MAX_LENGTH = 200
 const NOTE_MAX_LENGTH = 1000
 
 /**
@@ -23,11 +22,6 @@ export const completeShakenSchema = z.object({
     .nonnegative('走行距離は0以上で入力してください')
     .nullable()
     .default(null),
-  partDetail: z
-    .string()
-    .trim()
-    .max(PART_DETAIL_MAX_LENGTH, `部品/型式は${PART_DETAIL_MAX_LENGTH}文字以内で入力してください`)
-    .default(''),
   note: z
     .string()
     .trim()

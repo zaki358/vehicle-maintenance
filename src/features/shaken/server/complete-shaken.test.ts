@@ -9,7 +9,6 @@ describe('completeShakenHandler', () => {
       performedOn: '2026-09-06' as never,
       newExpiryDate: '2028-09-06' as never,
       odometerKm: 12345,
-      partDetail: '継続検査',
       note: '',
     },
   }
@@ -26,7 +25,6 @@ describe('completeShakenHandler', () => {
       p_performed_on: '2026-09-06',
       p_new_expiry_date: '2028-09-06',
       p_odometer_km: 12345,
-      p_part_detail: '継続検査',
       p_note: '',
     })
   })
