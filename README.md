@@ -1,6 +1,16 @@
 # vehicle-maintenance
 
-A minimal TanStack Start app with one route and plain CSS.
+車とバイクのメンテナンス記録 Web アプリ（TanStack Start / Supabase / Cloudflare Workers）。
+
+## ドキュメント
+
+- [プロジェクト解説・ファイル別目次](docs/README.md) — アプリ概要・機能・使用技術・フォルダ構成
+- [アーキテクチャ解説](docs/architecture.md) — Cloudflare Workers と Supabase の繋がり、認証・招待の流れ
+
+`docs/` には同じ内容の HTML 版（ブラウザ表示用）と Markdown 版（GitHub 表示用）があります。
+Markdown 版は HTML から `node tools/html-docs-to-md.mjs` で生成しています。
+
+## 開発
 
 ```bash
 npm install

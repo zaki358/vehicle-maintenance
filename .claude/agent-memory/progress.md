@@ -3,7 +3,7 @@
 > **セッション開始時、まずこのファイルを読むこと。**
 > 実装プラン全文: `C:\Users\barub\.claude\plans\tanstack-star-goofy-quill.md`
 
-最終更新: 2026-09-20(スマホ幅のナビ／ログアウトボタン崩れを修正。`519f721` コミット＋本番デプロイまで完了)
+最終更新: 2026-11-09(docs の HTML 解説を GitHub 表示用に Markdown 化。HTML はそのまま維持。未コミット)
 
 ---
 
@@ -543,6 +543,31 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
   「ブラウザで操作する」と言っている現状の挙動を変えない方を選んだ。
   manifest の `display: "standalone"` は Android 側のみに効く（iOS は無視する）
 
+### 2026-11-09（docs の Markdown 版を追加 — GitHub 上での閲覧用）
+
+依頼: 「docs のHTMLファイルはそのままで、github上でも確認したいからマークダウンファイルでも作成して」。
+GitHub は `.html` をソースとしてしか表示しないため、**HTML を一切変更せず**同じ内容の
+`.md` を併置した。
+
+- **`tools/html-docs-to-md.mjs` を追加**（依存なしの Node スクリプト）。`docs/**/*.html` 77 本を
+  Markdown に変換して同じディレクトリに同名で出力する。`node tools/html-docs-to-md.mjs` で再生成でき、
+  HTML を更新したら再実行すればよい（HTML が常に正本）
+- **`docs/index.html` だけは `docs/README.md` として出力**。GitHub で `docs/` を開いたときに
+  自動表示されるのが入口として自然なため。ページ間リンクの `index.html` も `README.md` に書き換えている
+- 変換の内容: 見出し・段落・表（`doc-structure`）・コードブロック（拡張子と中身から
+  `ts`/`tsx`/`css`/`sql`/`bash` を推定）・アスキー図（`arch-diagram` → ```` ```text ````）・
+  補足ボックス（`callout` → 引用）・索引カード（`index-grid` → リンク箇条書き）・フッター
+- **和文の折り返し改行は詰める**。HTML ソースの改行をそのまま空白にすると「です。 車検の」と
+  隙間が残るため、和文同士をつなぐ改行だけ落とし、同じ行に書かれた空白（コード片の前後など）は残す
+- **ページ間リンクは `.html` → `.md` に書き換え**、ページ内アンカーは github-slugger 相当の
+  スラッグへ変換した（`#overview` → `#アプリの概要`）
+- **検証**: 全 79 件（生成 77 ＋ 既存 `design.md`/`setup-supabase.md`）について、残存 HTML タグ・
+  未変換エンティティ・リンク切れ・ページ内アンカー不一致をスクリプトで検査し 0 件を確認
+- **ルート `README.md` にドキュメントへの導線を追加**。1 行目の説明がスキャフォールドのまま
+  （「A minimal TanStack Start app with one route」）だったのでプロジェクトの説明に直した。
+  ただし `## 開発` 以降の雛形の記述（`src/routes/index.tsx` を編集、など実態と合わない）は
+  依頼範囲外なので手を付けていない — **要整理**
+
 ## 判断の記録
 
 - **サブエージェントは4種類ともグローバルに実在し、新規作成は不要と確定した。**
@@ -708,9 +733,12 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 （https://vehicle-maintenance.y-kakeibo.workers.dev ）。
 開発環境では招待→パスワード設定→ログインまで実機で成功済み。
 本番でも招待→パスワード設定→ログインを依頼者が実機で確認済み。
-未コミットの変更は無い（`519f721` のナビ修正までコミット済み・本番デプロイ済み）。
+**未コミットの変更がある**: docs の Markdown 版 77 本 ＋ `tools/html-docs-to-md.mjs` ＋
+ルート `README.md` の導線追加（2026-11-09 の作業。コードには手を付けていないので
+再デプロイは不要）。
 
 **次にやること**: 依頼者が実データを入力して使用中。不具合の報告を待つ。
+docs の HTML を更新したときは `node tools/html-docs-to-md.mjs` で Markdown 版を再生成する。
 報告が来たら再現 → `superpowers:systematic-debugging` で原因特定 → 修正。
 着手待ちの既知の課題は 404 ページのみ（下記「保留」）。
 
@@ -851,4 +879,5 @@ A（DB）→ B（純粋ロジック）→ C（デザインシステム）→ D�
 - [x] Phase 6 — 整備記録 CRUD（server 5本 + record-form + ルート3本。ブラウザで動作確認済み）
 - [x] Phase 7 — ダッシュボードと車検アラート（complete-shaken RPC + ダッシュボード/車検UI。ブラウザで動作確認済み）
 - [x] Phase 8 — 検証（E2E / レビュー）とデプロイ（レビュー✅ / E2E✅ / 指摘修正✅ / マイグレーション適用✅ / デプロイ✅）
-- [x] Phase 9 — docs の HTML 解説ページ（各ファイル解説✅ / プロジェクト全体解説ページ✅ `docs/index.html`）
+- [x] Phase 9 — docs の HTML 解説ページ（各ファイル解説✅ / プロジェクト全体解説ページ✅ `docs/index.html`
+      / GitHub 表示用の Markdown 版✅ `tools/html-docs-to-md.mjs` で HTML から生成）
